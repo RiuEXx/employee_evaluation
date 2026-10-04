@@ -1,0 +1,14 @@
+# Apache settings for the Employee Performance Evaluation System (XAMPP).
+
+# No directory listings.
+Options -Indexes
+
+# Friendly error pages. If you rename the project folder, change
+# "/employee_evaluation" below to the new folder name.
+ErrorDocument 403 /employee_evaluation/403.php
+ErrorDocument 404 /employee_evaluation/404.php
+
+# Never serve SQL dumps, logs or ini files directly.
+<FilesMatch "\.(sql|log|ini)$">
+    Require all denied
+</FilesMatch>

@@ -1,0 +1,2 @@
+# This folder holds server-side files only. Block all web access.
+Require all denied
