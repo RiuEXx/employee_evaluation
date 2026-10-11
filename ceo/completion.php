@@ -11,7 +11,7 @@ $periods = result_periods();
 $period = selected_period($periods);
 $departments = departments_list(true);
 
-$q = get_str('q');
+$q = search_query();
 $deptFilter = get_int('department');
 $statusFilter = get_str('status');
 $statusOptions = ['' => 'All', 'unfinished' => 'Not finished', 'Not started' => 'Not started', 'In progress' => 'In progress', 'Complete' => 'Complete'];
@@ -23,7 +23,10 @@ $allRows = $period ? completion_rows((int) $period['id']) : [];
 $totals = completion_totals($allRows);
 $byDept = completion_by_department($allRows);
 
-$rows = array_values(array_filter($allRows, function ($r) use ($q, $deptFilter, $statusFilter) {
+// Employee numbers are shown (and searchable) only for people who manage employees.
+$showNumbers = can_see_employee_numbers();
+
+$rows = array_values(array_filter($allRows, function ($r) use ($q, $deptFilter, $statusFilter, $showNumbers) {
     if ($deptFilter && (int) $r['department_id'] !== $deptFilter) {
         return false;
     }
@@ -33,7 +36,7 @@ $rows = array_values(array_filter($allRows, function ($r) use ($q, $deptFilter, 
     if ($statusFilter !== '' && $statusFilter !== 'unfinished' && $r['status'] !== $statusFilter) {
         return false;
     }
-    return $q === '' || mb_stripos($r['name'] . ' ' . $r['employee_number'] . ' ' . $r['position'], $q) !== false;
+    return $q === '' || mb_stripos($r['name'] . ' ' . $r['position'] . ($showNumbers ? ' ' . $r['employee_number'] : ''), $q) !== false;
 }));
 foreach ($rows as &$row) {
     $row['sort_name'] = $row['last_name'] . ' ' . $row['first_name'];
@@ -73,7 +76,7 @@ require __DIR__ . '/../includes/header.php';
         </div>
         <div class="field">
             <label for="q">Search</label>
-            <input type="search" id="q" name="q" value="<?= e($q) ?>" placeholder="Name or number">
+            <input type="search" id="q" name="q" value="<?= e($q) ?>" maxlength="<?= SEARCH_MAX_LENGTH ?>" placeholder="<?= $showNumbers ? 'Name or number' : 'Name or position' ?>">
         </div>
         <button type="submit" class="btn btn-secondary">Apply</button>
         <a class="btn btn-secondary" href="<?= e(url('ceo/export.php?type=completion&period=' . (int) $period['id'])) ?>">Download CSV</a>
@@ -110,26 +113,30 @@ require __DIR__ . '/../includes/header.php';
                     <th scope="col" class="num">Employees finished</th>
                     <th scope="col" class="num">Evaluations submitted</th>
                     <th scope="col">Progress</th>
+                    <th scope="col" class="no-print">Action</th>
                 </tr>
                 </thead>
                 <tbody>
                 <?php foreach ($byDept as $id => $d): ?>
                     <tr>
-                        <td><a href="<?= e(query_url(['department' => $id, 'page' => null])) ?>"><?= e($d['name']) ?></a></td>
+                        <td><?= e($d['name']) ?></td>
                         <td class="num"><?= (int) $d['finished'] ?> of <?= (int) $d['evaluators'] ?></td>
                         <td class="num"><?= (int) $d['done'] ?> of <?= (int) $d['expected'] ?></td>
                         <td><?= progress_bar((int) $d['done'], (int) $d['expected']) ?></td>
+                        <td class="actions-cell no-print">
+                            <a class="btn btn-secondary btn-small" href="<?= e(query_url(['department' => $id, 'page' => null])) ?>#by-employee">Show employees</a>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
                 <?php if (!$byDept): ?>
-                    <tr class="empty-row"><td colspan="4">No one takes part in evaluations yet.</td></tr>
+                    <tr class="empty-row"><td colspan="5">No one takes part in evaluations yet.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
         </div>
     </section>
 
-    <section class="card">
+    <section class="card" id="by-employee">
         <h2>By employee</h2>
         <p class="muted small">Progress is measured against each employee's current department mates.</p>
         <div class="table-wrap">
@@ -147,7 +154,7 @@ require __DIR__ . '/../includes/header.php';
                 <tbody>
                 <?php foreach ($pageRows as $row): ?>
                     <tr>
-                        <td><?= e($row['name']) ?><br><span class="muted small"><?= e($row['employee_number']) ?></span></td>
+                        <td><?= e($row['name']) ?><?php if ($showNumbers): ?><br><span class="muted small"><?= e($row['employee_number']) ?></span><?php endif; ?></td>
                         <td><?= e($row['department_name']) ?></td>
                         <td class="num"><?= (int) $row['done'] ?> of <?= (int) $row['expected'] ?></td>
                         <td class="num"><?= (int) $row['remaining'] ?></td>

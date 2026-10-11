@@ -37,7 +37,7 @@ if (is_post()) {
     redirect(current_request_uri());
 }
 
-$q = get_str('q');
+$q = search_query();
 $params = [];
 $whereSql = '';
 if ($q !== '') {
@@ -85,7 +85,7 @@ require __DIR__ . '/../includes/header.php';
     <form method="get" class="filters m-0" role="search">
         <div class="field">
             <label for="q">Search</label>
-            <input type="search" id="q" name="q" value="<?= e($q) ?>" placeholder="Name or description">
+            <input type="search" id="q" name="q" value="<?= e($q) ?>" maxlength="<?= SEARCH_MAX_LENGTH ?>" placeholder="Name or description">
         </div>
         <button type="submit" class="btn btn-secondary">Search</button>
     </form>

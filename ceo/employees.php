@@ -11,9 +11,12 @@ $periods = result_periods();
 $period = selected_period($periods);
 $departments = departments_list();
 
-$q = get_str('q');
+$q = search_query();
 $deptFilter = get_int('department');
 $statusFilter = get_str('status') ?: 'active';
+
+// Employee numbers are shown (and searchable) only for people who manage employees.
+$showNumbers = can_see_employee_numbers();
 
 $rows = [];
 if ($period) {
@@ -42,7 +45,7 @@ if ($period) {
             continue;
         }
         $name = full_name($emp);
-        if ($q !== '' && mb_stripos($name . ' ' . $emp['employee_number'] . ' ' . $emp['position'], $q) === false) {
+        if ($q !== '' && mb_stripos($name . ' ' . $emp['position'] . ($showNumbers ? ' ' . $emp['employee_number'] : ''), $q) === false) {
             continue;
         }
         $g = $given[$id] ?? null;
@@ -91,7 +94,7 @@ require __DIR__ . '/../includes/header.php';
         </div>
         <div class="field">
             <label for="q">Search</label>
-            <input type="search" id="q" name="q" value="<?= e($q) ?>" placeholder="Name, number or position">
+            <input type="search" id="q" name="q" value="<?= e($q) ?>" maxlength="<?= SEARCH_MAX_LENGTH ?>" placeholder="<?= $showNumbers ? 'Name, number or position' : 'Name or position' ?>">
         </div>
         <button type="submit" class="btn btn-secondary">Apply</button>
         <a class="btn btn-secondary" href="<?= e(url('ceo/employees.php?period=' . (int) $period['id'])) ?>">Clear</a>
@@ -112,15 +115,16 @@ require __DIR__ . '/../includes/header.php';
                 <?= sort_th('Evaluations received', 'evaluations', $sort, 'num') ?>
                 <?= sort_th('Score', 'score', $sort, 'num') ?>
                 <?= sort_th('Evaluations given', 'given', $sort) ?>
+                <th scope="col" class="no-print">Action</th>
             </tr>
             </thead>
             <tbody>
             <?php foreach ($pageRows as $row): ?>
                 <tr>
                     <td>
-                        <a href="<?= e(url('ceo/employee.php?id=' . (int) $row['id'] . '&period=' . (int) $period['id'])) ?>"><?= e($row['name']) ?></a>
+                        <?= e($row['name']) ?>
                         <?php if ($row['status'] !== 'active'): ?> <?= status_badge('inactive') ?><?php endif; ?>
-                        <br><span class="muted small"><?= e($row['employee_number']) ?></span>
+                        <?php if ($showNumbers): ?><br><span class="muted small"><?= e($row['employee_number']) ?></span><?php endif; ?>
                     </td>
                     <td><?= e($row['department_name'] ?? '-') ?></td>
                     <td><?= e($row['position'] ?: '-') ?></td>
@@ -129,10 +133,13 @@ require __DIR__ . '/../includes/header.php';
                         <?= $row['overall'] !== null ? score_badge($row['overall']) : '<span class="muted small">Not enough</span>' ?>
                     </td>
                     <td><?= $row['given_total'] !== null ? e($row['given_done'] . ' of ' . $row['given_total']) : '<span class="muted">-</span>' ?></td>
+                    <td class="actions-cell no-print">
+                        <a class="btn btn-secondary btn-small" href="<?= e(url('ceo/employee.php?id=' . (int) $row['id'] . '&period=' . (int) $period['id'])) ?>">View</a>
+                    </td>
                 </tr>
             <?php endforeach; ?>
             <?php if (!$pageRows): ?>
-                <tr class="empty-row"><td colspan="6">No employees match these filters.</td></tr>
+                <tr class="empty-row"><td colspan="7">No employees match these filters.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>

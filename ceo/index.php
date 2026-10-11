@@ -145,22 +145,26 @@ $trend = array_values(array_filter(score_trend([]), fn($t) => $t['evaluations'] 
                 <th scope="col" class="num">Evaluations</th>
                 <th scope="col">Completion</th>
                 <th scope="col" class="num">Average score</th>
+                <th scope="col" class="no-print">Action</th>
             </tr>
             </thead>
             <tbody>
             <?php foreach ($deptRows as $row): ?>
                 <tr>
-                    <td><a href="<?= e(url('ceo/department.php?id=' . $row['id'] . '&period=' . $periodId)) ?>"><?= e($row['name']) ?></a></td>
+                    <td><?= e($row['name']) ?></td>
                     <td class="num"><?= (int) $row['employees'] ?></td>
                     <td class="num"><?= (int) $row['evaluations'] ?></td>
                     <td><?= $row['completion'] !== null
                             ? progress_bar((int) round($row['completion'] * 100), 100, format_percent($row['completion']))
                             : '<span class="muted">-</span>' ?></td>
                     <td class="num"><?= score_badge($row['overall']) ?></td>
+                    <td class="actions-cell no-print">
+                        <a class="btn btn-secondary btn-small" href="<?= e(url('ceo/department.php?id=' . $row['id'] . '&period=' . $periodId)) ?>">View</a>
+                    </td>
                 </tr>
             <?php endforeach; ?>
             <?php if (!$deptRows): ?>
-                <tr class="empty-row"><td colspan="5">No departments yet.</td></tr>
+                <tr class="empty-row"><td colspan="6">No departments yet.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
@@ -174,15 +178,18 @@ $trend = array_values(array_filter(score_trend([]), fn($t) => $t['evaluations'] 
             <div class="table-wrap">
                 <table>
                     <thead>
-                    <tr><th scope="col">Employee</th><th scope="col">Department</th><th scope="col" class="num">Score</th></tr>
+                    <tr><th scope="col">Employee</th><th scope="col">Department</th><th scope="col" class="num">Score</th><th scope="col" class="no-print">Action</th></tr>
                     </thead>
                     <tbody>
                     <?php foreach ($ranked as $row): ?>
                         <tr>
-                            <td><a href="<?= e(url('ceo/employee.php?id=' . (int) $row['id'] . '&period=' . $periodId)) ?>"><?= e(full_name($row)) ?></a>
+                            <td><?= e(full_name($row)) ?>
                                 <br><span class="muted small"><?= e($row['position'] ?? '') ?></span></td>
                             <td><?= e($row['department_name'] ?? '-') ?></td>
                             <td class="num"><?= score_badge($row['overall']) ?></td>
+                            <td class="actions-cell no-print">
+                                <a class="btn btn-secondary btn-small" href="<?= e(url('ceo/employee.php?id=' . (int) $row['id'] . '&period=' . $periodId)) ?>">View</a>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

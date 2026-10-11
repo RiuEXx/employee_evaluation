@@ -23,6 +23,8 @@ if (!$period) {
 $periodId = (int) $period['id'];
 $deptFilter = get_int('department');
 $categories = categories_map();
+// Employee numbers go into the file only for people who manage employees, as on screen.
+$withNumbers = can_see_employee_numbers();
 
 /**
  * Makes a value safe for spreadsheets: text starting with = + - @ could be run
@@ -48,7 +50,8 @@ if ($type === 'employees') {
     $employees = employees_by_id();
     $catIds = array_keys(rollup_entry(score_rollup($where))['categories']);
 
-    $header = ['Employee Number', 'First Name', 'Last Name', 'Department (at evaluation)', 'Position', 'Status', 'Evaluations Received', 'Overall Score'];
+    $header = array_merge($withNumbers ? ['Employee Number'] : [],
+        ['First Name', 'Last Name', 'Department (at evaluation)', 'Position', 'Status', 'Evaluations Received', 'Overall Score']);
     foreach ($catIds as $catId) {
         $header[] = $categories[$catId]['name'] ?? 'Category ' . $catId;
     }
@@ -68,11 +71,11 @@ if ($type === 'employees') {
         $entry = $emp['entry'];
         $enough = enough_evaluations($entry['evaluations']);
         $dept = $emp['dept_id'] ? find_department($emp['dept_id']) : null;
-        $row = [
-            $emp['employee_number'], $emp['first_name'], $emp['last_name'], $dept['name'] ?? '',
+        $row = array_merge($withNumbers ? [$emp['employee_number']] : [], [
+            $emp['first_name'], $emp['last_name'], $dept['name'] ?? '',
             $emp['position'], $emp['status'], $entry['evaluations'],
             $enough ? number_format($entry['overall'], 2, '.', '') : '',
-        ];
+        ]);
         foreach ($catIds as $catId) {
             $row[] = $enough && isset($entry['categories'][$catId]) ? number_format($entry['categories'][$catId], 2, '.', '') : '';
         }
@@ -99,12 +102,13 @@ if ($type === 'employees') {
         ];
     }
 } else {
-    $rows[] = ['Employee Number', 'First Name', 'Last Name', 'Department', 'Position', 'Evaluations Done', 'Evaluations Expected', 'Completion %', 'Status'];
+    $rows[] = array_merge($withNumbers ? ['Employee Number'] : [],
+        ['First Name', 'Last Name', 'Department', 'Position', 'Evaluations Done', 'Evaluations Expected', 'Completion %', 'Status']);
     foreach (completion_rows($periodId, $deptFilter ?: null) as $r) {
-        $rows[] = [
-            $r['employee_number'], $r['first_name'], $r['last_name'], $r['department_name'], $r['position'],
+        $rows[] = array_merge($withNumbers ? [$r['employee_number']] : [], [
+            $r['first_name'], $r['last_name'], $r['department_name'], $r['position'],
             $r['done'], $r['expected'], round($r['rate'] * 100), $r['status'],
-        ];
+        ]);
     }
 }
 

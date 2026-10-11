@@ -31,7 +31,7 @@ function current_grid(): array
 
 $grid = current_grid();
 $roleErrors = [];
-$newRole = ['name' => '', 'description' => ''];
+$newRole = ['name' => '', 'number_prefix' => '', 'description' => ''];
 
 if (is_post()) {
     $action = post_str('action');
@@ -93,19 +93,23 @@ if (is_post()) {
     }
 
     if ($action === 'add_role') {
-        $newRole = ['name' => post_str('name'), 'description' => post_str('description')];
+        $newRole = ['name' => post_str('name'), 'number_prefix' => strtoupper(post_str('number_prefix')), 'description' => post_str('description')];
         if ($newRole['name'] === '' || mb_strlen($newRole['name']) > 50) {
             $roleErrors['name'] = 'Enter a role name of at most 50 characters.';
         } elseif (in_array(mb_strtolower($newRole['name']), array_map('mb_strtolower', array_column($roles, 'name')), true)) {
             $roleErrors['name'] = 'A role with this name already exists.';
         }
+        if (!preg_match('/^[A-Z]{2,5}$/', $newRole['number_prefix'])) {
+            $roleErrors['number_prefix'] = 'Enter 2 to 5 letters, for example SUP.';
+        }
         if (mb_strlen($newRole['description']) > 255) {
             $roleErrors['description'] = 'At most 255 characters.';
         }
+        reject_emoji($newRole, $roleErrors);
         if (!$roleErrors) {
-            db()->prepare('INSERT INTO roles (name, description, is_system) VALUES (?, ?, 0)')
-                ->execute([$newRole['name'], $newRole['description'] !== '' ? $newRole['description'] : null]);
-            audit_log('role_create', 'Role: ' . $newRole['name'] . '.');
+            db()->prepare('INSERT INTO roles (name, number_prefix, description, is_system) VALUES (?, ?, ?, 0)')
+                ->execute([$newRole['name'], $newRole['number_prefix'], $newRole['description'] !== '' ? $newRole['description'] : null]);
+            audit_log('role_create', 'Role: ' . $newRole['name'] . ' (tag ' . $newRole['number_prefix'] . ').');
             flash('success', 'Role "' . $newRole['name'] . '" added. Tick its permissions in the grid and save.');
             redirect('admin/roles.php');
         }
@@ -193,12 +197,13 @@ require __DIR__ . '/../includes/header.php';
         <div class="table-wrap">
             <table>
                 <thead>
-                <tr><th scope="col">Role</th><th scope="col" class="num">People</th><th scope="col">Actions</th></tr>
+                <tr><th scope="col">Role</th><th scope="col">Number tag</th><th scope="col" class="num">People</th><th scope="col">Actions</th></tr>
                 </thead>
                 <tbody>
                 <?php foreach ($roles as $role): ?>
                     <tr>
                         <td><?= e($role['name']) ?><br><span class="muted small"><?= e($role['description'] ?? '') ?></span></td>
+                        <td><span class="badge badge-blue"><?= e($role['number_prefix']) ?></span></td>
                         <td class="num"><?= (int) $role['employees'] ?></td>
                         <td class="actions-cell">
                             <?php if ((int) $role['is_system'] === 1): ?>
@@ -229,6 +234,14 @@ require __DIR__ . '/../includes/header.php';
                 <label for="name">Name <span class="required-mark">*</span></label>
                 <input type="text" id="name" name="name" value="<?= e($newRole['name']) ?>" maxlength="50" required>
                 <?php if (isset($roleErrors['name'])): ?><p class="field-error"><?= e($roleErrors['name']) ?></p><?php endif; ?>
+            </div>
+            <div class="field<?= isset($roleErrors['number_prefix']) ? ' has-error' : '' ?>">
+                <label for="number_prefix">Number tag <span class="required-mark">*</span></label>
+                <input type="text" id="number_prefix" name="number_prefix" value="<?= e($newRole['number_prefix']) ?>"
+                       maxlength="5" autocapitalize="characters" autocomplete="off" spellcheck="false" class="narrow-input"
+                       data-letters aria-describedby="number-prefix-help" required>
+                <p class="field-help" id="number-prefix-help">2 to 5 letters that start the employee numbers of this role, for example SUP for SUP1030. It cannot be changed later.</p>
+                <?php if (isset($roleErrors['number_prefix'])): ?><p class="field-error"><?= e($roleErrors['number_prefix']) ?></p><?php endif; ?>
             </div>
             <div class="field<?= isset($roleErrors['description']) ? ' has-error' : '' ?>">
                 <label for="description">Description</label>

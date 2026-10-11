@@ -48,12 +48,14 @@ if (is_post()) {
     if (mb_strlen($form['description']) > 255) {
         $errors['description'] = 'At most 255 characters.';
     }
-    if (!is_numeric($form['weight']) || (float) $form['weight'] <= 0 || (float) $form['weight'] > 100) {
+    // Plain digits with at most 2 decimals: is_numeric() would also accept "1e1" or " 1".
+    if (!preg_match('/^\d{1,3}(\.\d{1,2})?$/', $form['weight']) || (float) $form['weight'] <= 0 || (float) $form['weight'] > 100) {
         $errors['weight'] = 'Enter a number greater than 0 and at most 100, for example 1 or 1.5.';
     }
-    if (!preg_match('/^-?\d{1,6}$/', $form['sort_order'])) {
-        $errors['sort_order'] = 'Enter a whole number.';
+    if (!preg_match('/^\d{1,6}$/', $form['sort_order'])) {
+        $errors['sort_order'] = 'Enter a whole number from 0 to 999999.';
     }
+    reject_emoji($form, $errors);
 
     if (!$errors) {
         $values = [
@@ -113,13 +115,15 @@ require __DIR__ . '/../includes/header.php';
         <div class="form-grid">
             <div class="field<?= isset($errors['weight']) ? ' has-error' : '' ?>">
                 <label for="weight">Weight</label>
-                <input type="number" id="weight" name="weight" value="<?= e($form['weight']) ?>" min="0.01" max="100" step="0.01" required>
+                <input type="text" id="weight" name="weight" value="<?= e($form['weight']) ?>" inputmode="decimal" maxlength="6"
+                       data-decimal data-min="0.01" data-max="100" autocomplete="off" required>
                 <p class="field-help">1 = normal. 1.5 counts one and a half times as much.</p>
                 <?php if (isset($errors['weight'])): ?><p class="field-error"><?= e($errors['weight']) ?></p><?php endif; ?>
             </div>
             <div class="field<?= isset($errors['sort_order']) ? ' has-error' : '' ?>">
                 <label for="sort_order">Order on the form</label>
-                <input type="number" id="sort_order" name="sort_order" value="<?= e($form['sort_order']) ?>" step="1" required>
+                <input type="text" id="sort_order" name="sort_order" value="<?= e($form['sort_order']) ?>" inputmode="numeric"
+                       pattern="[0-9]*" maxlength="6" data-digits data-min="0" data-max="999999" autocomplete="off" required>
                 <p class="field-help">Lower numbers come first.</p>
                 <?php if (isset($errors['sort_order'])): ?><p class="field-error"><?= e($errors['sort_order']) ?></p><?php endif; ?>
             </div>

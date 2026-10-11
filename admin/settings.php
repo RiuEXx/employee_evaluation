@@ -37,12 +37,15 @@ if (is_post()) {
                 $new[$key] = isset($_POST['s_' . $key]) ? '1' : '0';
                 break;
             case 'int':
+                // Digits only: no sign, decimal point, exponent ("e") or other characters.
                 if (!preg_match('/^\d{1,6}$/', $raw)
                     || ($s['min_value'] !== null && (int) $raw < (int) $s['min_value'])
                     || ($s['max_value'] !== null && (int) $raw > (int) $s['max_value'])) {
                     $errors[$key] = 'Enter a whole number from ' . $s['min_value'] . ' to ' . $s['max_value'] . '.';
+                    $new[$key] = $raw;
+                } else {
+                    $new[$key] = (string) (int) $raw; // "007" is saved as "7"
                 }
-                $new[$key] = $raw;
                 break;
             case 'select':
                 if (!array_key_exists($raw, setting_choices($s['options']))) {
@@ -53,6 +56,8 @@ if (is_post()) {
             default:
                 if (mb_strlen($raw) > 255) {
                     $errors[$key] = 'At most 255 characters.';
+                } elseif (has_emoji($raw)) {
+                    $errors[$key] = 'Emoji are not allowed. Use plain text only.';
                 }
                 $new[$key] = $raw;
         }
@@ -121,8 +126,10 @@ require __DIR__ . '/../includes/header.php';
                             <?= select_options(setting_choices($s['options']), $value) ?>
                         </select>
                     <?php elseif ($s['input_type'] === 'int'): ?>
-                        <input type="number" id="<?= e($field) ?>" name="<?= e($field) ?>" value="<?= e($value) ?>"
-                               min="<?= e($s['min_value']) ?>" max="<?= e($s['max_value']) ?>" step="1" class="narrow-input">
+                        <input type="text" id="<?= e($field) ?>" name="<?= e($field) ?>" value="<?= e($value) ?>"
+                               inputmode="numeric" pattern="[0-9]*" maxlength="<?= strlen((string) $s['max_value']) ?>"
+                               data-digits data-min="<?= e($s['min_value']) ?>" data-max="<?= e($s['max_value']) ?>"
+                               autocomplete="off" class="narrow-input">
                     <?php elseif ($key === 'default_pin'): ?>
                         <input type="text" id="<?= e($field) ?>" name="<?= e($field) ?>" value="<?= e($value) ?>"
                                inputmode="numeric" pattern="[0-9]{4}" maxlength="4" data-pin class="narrow-input" autocomplete="off">

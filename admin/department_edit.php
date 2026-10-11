@@ -38,6 +38,7 @@ if (is_post()) {
     if (mb_strlen($form['description']) > 255) {
         $errors['description'] = 'The description can be at most 255 characters.';
     }
+    reject_emoji($form, $errors);
 
     if (!$errors) {
         $description = $form['description'] !== '' ? $form['description'] : null;

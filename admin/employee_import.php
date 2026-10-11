@@ -3,9 +3,11 @@
  * Bulk import of employees from a CSV file.
  *
  * Columns (first row = header, any order):
- *   employee_number, first_name, last_name   required
- *   email, position, department, role, date_hired (YYYY-MM-DD)   optional
+ *   first_name, last_name   required
+ *   employee_number, email, position, department, role, date_hired (YYYY-MM-DD)   optional
  * Department and role are matched by name (role defaults to "Employee").
+ * An employee number must start with its role's tag (EMP1024 for an
+ * Employee); an empty one gets the next free number.
  * The whole file is checked first; if any row has an error nothing is
  * imported, so a file is never half-loaded.
  */
@@ -23,7 +25,7 @@ if (get_str('template') === '1') {
     fwrite($out, "\xEF\xBB\xBF");
     fputcsv($out, IMPORT_COLUMNS, ',', '"', '');
     fputcsv($out, ['EMP2001', 'Maria', 'Santos', 'maria.santos@example.com', 'Accountant', 'Finance', 'Employee', '2026-01-15'], ',', '"', '');
-    fputcsv($out, ['EMP2002', 'John', 'Reyes', '', 'IT Support Specialist', 'Information Technology', '', ''], ',', '"', '');
+    fputcsv($out, ['', 'John', 'Reyes', '', 'IT Support Specialist', 'Information Technology', '', ''], ',', '"', '');
     fclose($out);
     exit;
 }
@@ -63,7 +65,7 @@ if (is_post()) {
         } else {
             $header[0] = preg_replace('/^\xEF\xBB\xBF/', '', (string) $header[0]); // remove a UTF-8 BOM
             $header = array_map(fn($h) => strtolower(trim((string) $h)), $header);
-            foreach (['employee_number', 'first_name', 'last_name'] as $required) {
+            foreach (['first_name', 'last_name'] as $required) {
                 if (!in_array($required, $header, true)) {
                     $errors[] = 'The header row is missing the column "' . $required . '".';
                 }
@@ -100,22 +102,44 @@ if (is_post()) {
             $deptIds[mb_strtolower($d['name'])] = (int) $d['id'];
         }
         $roleIds = [];
-        foreach (db()->query('SELECT id, name FROM roles')->fetchAll() as $r) {
+        $rolePrefixes = [];
+        foreach (db()->query('SELECT id, name, number_prefix FROM roles')->fetchAll() as $r) {
             $roleIds[mb_strtolower($r['name'])] = (int) $r['id'];
+            $rolePrefixes[(int) $r['id']] = $r['number_prefix'];
         }
-        $existing = db()->query('SELECT UPPER(employee_number) AS n, LOWER(email) AS m FROM employees')->fetchAll();
-        $numbers = array_flip(array_column($existing, 'n'));
+        $existing = db()->query('SELECT employee_number AS n, LOWER(email) AS m FROM employees')->fetchAll();
+        // Digits already in use (as numbers, so 1005 and 01005 are the same), in the database or earlier in the file.
+        $usedDigits = [];
+        foreach (array_column($existing, 'n') as $number) {
+            if (preg_match('/(\d+)$/', $number, $m)) {
+                $usedDigits[(int) $m[1]] = $number;
+            }
+        }
         $emails = array_flip(array_filter(array_column($existing, 'm')));
 
         foreach ($rows as &$row) {
             $prefix = 'Row ' . $row['line'] . ': ';
-            $row['employee_number'] = strtoupper($row['employee_number']);
-            if (!preg_match('/^[A-Za-z0-9-]{3,20}$/', $row['employee_number'])) {
-                $errors[] = $prefix . 'employee number "' . $row['employee_number'] . '" must be 3 to 20 letters, digits or dashes.';
-            } elseif (isset($numbers[$row['employee_number']])) {
-                $errors[] = $prefix . 'employee number ' . $row['employee_number'] . ' already exists.';
+
+            $roleName = $row['role'] !== '' ? $row['role'] : 'Employee';
+            $row['role_id'] = $roleIds[mb_strtolower($roleName)] ?? null;
+            if ($row['role_id'] === null) {
+                $errors[] = $prefix . 'role "' . $roleName . '" does not exist.';
             }
-            $numbers[$row['employee_number']] = true;
+
+            // A given number must be the role's tag plus digits; an empty one is filled in below.
+            $row['employee_number'] = strtoupper($row['employee_number']);
+            if ($row['employee_number'] !== '' && $row['role_id'] !== null) {
+                $tag = $rolePrefixes[$row['role_id']];
+                $digits = employee_number_digits($row['employee_number']);
+                if ($digits === '' || !str_starts_with($row['employee_number'], $tag) || strlen($row['employee_number']) !== strlen($tag . $digits)) {
+                    $errors[] = $prefix . 'employee number "' . $row['employee_number'] . '" must be ' . $tag . ' followed by '
+                        . EMPLOYEE_NUMBER_MIN_DIGITS . ' to 6 digits (the tag of the role ' . $roleName . '), or empty.';
+                } elseif (isset($usedDigits[(int) $digits])) {
+                    $errors[] = $prefix . 'the number ' . $digits . ' is already used by ' . $usedDigits[(int) $digits] . '.';
+                } else {
+                    $usedDigits[(int) $digits] = $row['employee_number'];
+                }
+            }
 
             foreach (['first_name' => 'first name', 'last_name' => 'last name'] as $col => $label) {
                 if ($row[$col] === '' || mb_strlen($row[$col]) > 60) {
@@ -140,16 +164,30 @@ if (is_post()) {
                     $errors[] = $prefix . 'department "' . $row['department'] . '" does not exist.';
                 }
             }
-            $roleName = $row['role'] !== '' ? $row['role'] : 'Employee';
-            $row['role_id'] = $roleIds[mb_strtolower($roleName)] ?? null;
-            if ($row['role_id'] === null) {
-                $errors[] = $prefix . 'role "' . $roleName . '" does not exist.';
-            }
             if ($row['date_hired'] !== '' && !is_valid_date($row['date_hired'])) {
                 $errors[] = $prefix . 'date hired "' . $row['date_hired'] . '" must be a date written as YYYY-MM-DD.';
+            } elseif ($row['date_hired'] !== '' && !is_date_between($row['date_hired'], MIN_DATE, today_date())) {
+                $errors[] = $prefix . 'date hired "' . $row['date_hired'] . '" must be from ' . MIN_DATE . ' to ' . today_date() . '.';
+            }
+            foreach (IMPORT_COLUMNS as $col) {
+                if (has_emoji($row[$col])) {
+                    $errors[] = $prefix . str_replace('_', ' ', $col) . ' contains an emoji; use plain text only.';
+                }
             }
         }
         unset($row);
+
+        // Rows without a number get the next free ones, after every number in use.
+        if (!$errors) {
+            $next = $usedDigits ? max(array_keys($usedDigits)) + 1 : 1001;
+            foreach ($rows as &$row) {
+                if ($row['employee_number'] === '') {
+                    $row['employee_number'] = $rolePrefixes[$row['role_id']]
+                        . str_pad((string) $next++, EMPLOYEE_NUMBER_MIN_DIGITS, '0', STR_PAD_LEFT);
+                }
+            }
+            unset($row);
+        }
     }
 
     // Import everything in one transaction.
@@ -238,9 +276,11 @@ require __DIR__ . '/../includes/header.php';
     <section class="card">
         <h2>1. Prepare the file</h2>
         <p>
-            Use a CSV file with a header row. Required columns: <strong>employee_number</strong>, <strong>first_name</strong>,
-            <strong>last_name</strong>. Optional: email, position, department, role, date_hired (YYYY-MM-DD).
+            Use a CSV file with a header row. Required columns: <strong>first_name</strong>, <strong>last_name</strong>.
+            Optional: employee_number, email, position, department, role, date_hired (YYYY-MM-DD).
             Department and role must match existing names; an empty role means Employee.
+            An employee number starts with the tag of its role (for example EMP1024 for an Employee, ADM1025 for an Admin);
+            leave it empty to get the next free number.
         </p>
         <p class="mb-0"><a class="btn btn-secondary" href="<?= e(url('admin/employee_import.php?template=1')) ?>">Download a template</a></p>
     </section>

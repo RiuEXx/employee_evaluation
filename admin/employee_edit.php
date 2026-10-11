@@ -20,7 +20,8 @@ if ($id && !$employee) {
 $isSelf = $employee && (int) $employee['id'] === (int) $user['id'];
 
 $departments = departments_list();
-$roles = db()->query('SELECT id, name FROM roles ORDER BY id')->fetchAll();
+$roles = db()->query('SELECT id, name, number_prefix FROM roles ORDER BY id')->fetchAll();
+$prefixes = array_column($roles, 'number_prefix', 'id');
 $defaultRoleId = (int) (db()->query("SELECT id FROM roles WHERE name = 'Employee'")->fetchColumn() ?: $roles[0]['id']);
 
 // How many evaluations involve this employee (deleting is only allowed at 0).
@@ -48,8 +49,9 @@ if (is_post() && post_str('action') === 'delete' && $employee) {
     redirect('admin/employees.php');
 }
 
+// The employee number is the role's tag (from the roles table) plus these digits.
 $form = [
-    'employee_number' => $employee['employee_number'] ?? '',
+    'employee_digits' => $employee ? employee_number_digits($employee['employee_number']) : next_employee_digits(),
     'first_name'      => $employee['first_name'] ?? '',
     'last_name'       => $employee['last_name'] ?? '',
     'email'           => $employee['email'] ?? '',
@@ -62,24 +64,18 @@ $form = [
 $errors = [];
 
 if (is_post() && post_str('action') === 'save') {
-    foreach (['employee_number', 'first_name', 'last_name', 'email', 'position', 'department_id', 'role_id', 'date_hired', 'status'] as $field) {
+    foreach (array_keys($form) as $field) {
         $form[$field] = post_str($field);
     }
-    $form['employee_number'] = strtoupper($form['employee_number']);
     if ($isSelf) {
         // Your own role and status cannot be changed here.
         $form['role_id'] = (string) $employee['role_id'];
         $form['status'] = $employee['status'];
     }
 
-    if (!preg_match('/^[A-Za-z0-9-]{3,20}$/', $form['employee_number'])) {
-        $errors['employee_number'] = 'Use 3 to 20 letters, digits or dashes, for example EMP1024.';
-    } else {
-        $stmt = db()->prepare('SELECT COUNT(*) FROM employees WHERE employee_number = ? AND id <> ?');
-        $stmt->execute([$form['employee_number'], $id]);
-        if ($stmt->fetchColumn() > 0) {
-            $errors['employee_number'] = 'This employee number is already in use.';
-        }
+    $digitsProblem = employee_digits_problem($form['employee_digits'], $id);
+    if ($digitsProblem !== '') {
+        $errors['employee_digits'] = $digitsProblem;
     }
     foreach (['first_name' => 'first name', 'last_name' => 'last name'] as $field => $label) {
         if ($form[$field] === '') {
@@ -108,16 +104,19 @@ if (is_post() && post_str('action') === 'save') {
     if (!in_array((int) $form['role_id'], array_map('intval', array_column($roles, 'id')), true)) {
         $errors['role_id'] = 'Choose a role from the list.';
     }
-    if ($form['date_hired'] !== '' && (!is_valid_date($form['date_hired']) || $form['date_hired'] > date('Y-m-d'))) {
-        $errors['date_hired'] = 'Enter a valid date that is not in the future.';
+    if ($form['date_hired'] !== '' && !is_date_between($form['date_hired'], MIN_DATE, today_date())) {
+        $errors['date_hired'] = date_range_message(MIN_DATE, today_date());
     }
     if (!in_array($form['status'], ['active', 'inactive'], true)) {
         $errors['status'] = 'Choose a status.';
     }
+    reject_emoji($form, $errors);
 
     if (!$errors) {
+        // The tag always follows the role: a new role gives a new tag, the digits stay.
+        $number = $prefixes[(int) $form['role_id']] . $form['employee_digits'];
         $values = [
-            $form['employee_number'], $form['first_name'], $form['last_name'],
+            $number, $form['first_name'], $form['last_name'],
             $form['email'] !== '' ? $form['email'] : null,
             $form['position'] !== '' ? $form['position'] : null,
             $form['department_id'] !== '' ? (int) $form['department_id'] : null,
@@ -125,7 +124,7 @@ if (is_post() && post_str('action') === 'save') {
             $form['date_hired'] !== '' ? $form['date_hired'] : null,
             $form['status'],
         ];
-        $label = $form['first_name'] . ' ' . $form['last_name'] . ' (' . $form['employee_number'] . ')';
+        $label = $form['first_name'] . ' ' . $form['last_name'] . ' (' . $number . ')';
 
         if ($employee) {
             db()->prepare(
@@ -138,6 +137,9 @@ if (is_post() && post_str('action') === 'save') {
             $names = array_column($departments, 'name', 'id');
             $roleNames = array_column($roles, 'name', 'id');
             $changes = [];
+            if ($employee['employee_number'] !== $number) {
+                $changes[] = 'employee number ' . $employee['employee_number'] . ' to ' . $number;
+            }
             if ((string) $employee['department_id'] !== $form['department_id']) {
                 $changes[] = 'department ' . ($names[$employee['department_id']] ?? 'none') . ' to ' . ($names[$form['department_id']] ?? 'none');
             }
@@ -148,7 +150,11 @@ if (is_post() && post_str('action') === 'save') {
                 $changes[] = 'status ' . $employee['status'] . ' to ' . $form['status'];
             }
             audit_log('employee_update', 'Updated ' . $label . ($changes ? ': ' . implode('; ', $changes) : '') . '.');
-            flash('success', $label . ' has been updated.');
+            flash('success', $label . ' has been updated.'
+                . ($employee['employee_number'] !== $number
+                    ? ' Their employee number changed from ' . $employee['employee_number'] . ' to ' . $number
+                      . ', so they now log in with ' . $number . '.'
+                    : ''));
         } else {
             $pin = new_account_pin();
             db()->prepare(
@@ -201,12 +207,23 @@ function text_field(string $name, string $label, array $form, array $errors, arr
         <input type="hidden" name="id" value="<?= (int) $id ?>">
 
         <div class="form-grid">
-            <?php text_field('employee_number', 'Employee number', $form, $errors, ['required' => true, 'maxlength' => 20, 'autocomplete' => 'off']); ?>
+            <div class="field<?= isset($errors['employee_digits']) ? ' has-error' : '' ?>">
+                <label for="employee_digits">Employee number <span class="required-mark">*</span></label>
+                <div class="input-prefix">
+                    <span class="input-prefix-tag" id="number-prefix"><?= e($prefixes[(int) $form['role_id']] ?? '') ?></span>
+                    <input type="text" id="employee_digits" name="employee_digits" value="<?= e($form['employee_digits']) ?>"
+                           inputmode="numeric" pattern="[0-9]*" minlength="<?= EMPLOYEE_NUMBER_MIN_DIGITS ?>" maxlength="6"
+                           data-digits data-message="Enter <?= EMPLOYEE_NUMBER_MIN_DIGITS ?> to 6 digits."
+                           aria-describedby="number-help" autocomplete="off" required>
+                </div>
+                <p class="field-help" id="number-help">The tag comes from the role (<?= e(implode(', ', array_unique($prefixes))) ?>) and changes with it; the digits stay.</p>
+                <?php if (isset($errors['employee_digits'])): ?><p class="field-error"><?= e($errors['employee_digits']) ?></p><?php endif; ?>
+            </div>
             <?php text_field('email', 'Email', $form, $errors, ['type' => 'email', 'maxlength' => 150]); ?>
             <?php text_field('first_name', 'First name', $form, $errors, ['required' => true, 'maxlength' => 60]); ?>
             <?php text_field('last_name', 'Last name', $form, $errors, ['required' => true, 'maxlength' => 60]); ?>
             <?php text_field('position', 'Position', $form, $errors, ['maxlength' => 100]); ?>
-            <?php text_field('date_hired', 'Date hired', $form, $errors, ['type' => 'date', 'max' => date('Y-m-d')]); ?>
+            <?php text_field('date_hired', 'Date hired', $form, $errors, ['type' => 'date', 'min' => MIN_DATE, 'max' => today_date()]); ?>
 
             <div class="field<?= isset($errors['department_id']) ? ' has-error' : '' ?>">
                 <label for="department_id">Department</label>
@@ -224,8 +241,11 @@ function text_field(string $name, string $label, array $form, array $errors, arr
 
             <div class="field<?= isset($errors['role_id']) ? ' has-error' : '' ?>">
                 <label for="role_id">Role</label>
-                <select id="role_id" name="role_id" <?= $isSelf ? 'disabled' : '' ?>>
-                    <?= select_options(array_column($roles, 'name', 'id'), $form['role_id']) ?>
+                <select id="role_id" name="role_id" data-prefix-target="number-prefix" <?= $isSelf ? 'disabled' : '' ?>>
+                    <?php foreach ($roles as $role): ?>
+                        <option value="<?= (int) $role['id'] ?>" data-prefix="<?= e($role['number_prefix']) ?>"
+                            <?= (string) $role['id'] === $form['role_id'] ? 'selected' : '' ?>><?= e($role['name']) ?> (<?= e($role['number_prefix']) ?>)</option>
+                    <?php endforeach; ?>
                 </select>
                 <?php if ($isSelf): ?><p class="field-help">You cannot change your own role.</p><?php endif; ?>
                 <?php if (isset($errors['role_id'])): ?><p class="field-error"><?= e($errors['role_id']) ?></p><?php endif; ?>

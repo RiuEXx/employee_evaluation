@@ -1,0 +1,2 @@
+# System log files (written by includes/logger.php). Block all web access.
+Require all denied

@@ -20,6 +20,10 @@ $form = [
 ];
 $errors = [];
 
+// Periods may be planned ahead, so the latest allowed date is in the future.
+$minDate = MIN_DATE;
+$maxDate = period_max_date();
+
 if (is_post()) {
     foreach (array_keys($form) as $field) {
         $form[$field] = post_str($field);
@@ -36,12 +40,17 @@ if (is_post()) {
     }
     if (!is_valid_date($form['start_date'])) {
         $errors['start_date'] = 'Enter a valid start date.';
+    } elseif (!is_date_between($form['start_date'], $minDate, $maxDate)) {
+        $errors['start_date'] = date_range_message($minDate, $maxDate);
     }
     if (!is_valid_date($form['end_date'])) {
         $errors['end_date'] = 'Enter a valid end date.';
+    } elseif (!is_date_between($form['end_date'], $minDate, $maxDate)) {
+        $errors['end_date'] = date_range_message($minDate, $maxDate);
     } elseif (!isset($errors['start_date']) && $form['end_date'] < $form['start_date']) {
         $errors['end_date'] = 'The end date cannot be before the start date.';
     }
+    reject_emoji($form, $errors);
 
     if (!$errors) {
         if ($period) {
@@ -86,18 +95,21 @@ require __DIR__ . '/../includes/header.php';
         <div class="form-grid">
             <div class="field<?= isset($errors['start_date']) ? ' has-error' : '' ?>">
                 <label for="start_date">Start date <span class="required-mark">*</span></label>
-                <input type="date" id="start_date" name="start_date" value="<?= e($form['start_date']) ?>" required>
+                <input type="date" id="start_date" name="start_date" value="<?= e($form['start_date']) ?>"
+                       min="<?= e($minDate) ?>" max="<?= e($maxDate) ?>" required>
                 <?php if (isset($errors['start_date'])): ?><p class="field-error"><?= e($errors['start_date']) ?></p><?php endif; ?>
             </div>
             <div class="field<?= isset($errors['end_date']) ? ' has-error' : '' ?>">
                 <label for="end_date">End date <span class="required-mark">*</span></label>
-                <input type="date" id="end_date" name="end_date" value="<?= e($form['end_date']) ?>" required>
+                <input type="date" id="end_date" name="end_date" value="<?= e($form['end_date']) ?>"
+                       min="<?= e($minDate) ?>" max="<?= e($maxDate) ?>" required>
                 <?php if (isset($errors['end_date'])): ?><p class="field-error"><?= e($errors['end_date']) ?></p><?php endif; ?>
             </div>
         </div>
         <p class="field-help">
             The dates tell employees when the round runs. Evaluations are accepted while the period is open,
-            so remember to close it at the end date.
+            so remember to close it at the end date. Dates can be from <?= e(format_date($minDate)) ?>
+            to <?= e(format_date($maxDate)) ?>.
         </p>
 
         <div class="form-actions">

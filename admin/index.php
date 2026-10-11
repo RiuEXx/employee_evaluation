@@ -30,9 +30,27 @@ if (can('audit.view')) {
     )->fetchAll();
 }
 
+// Serious problems in the system log during the last 24 hours.
+$recentProblems = 0;
+if (can('system_log.view')) {
+    $since = date('Y-m-d H:i:s', strtotime('-24 hours'));
+    foreach (read_system_log(date('Y-m-d', strtotime('-1 day')), today_date()) as $entry) {
+        if ($entry['time'] >= $since && in_array($entry['level'], ['critical', 'error'], true)) {
+            $recentProblems++;
+        }
+    }
+}
+
 $pageTitle = 'Admin Dashboard';
 require __DIR__ . '/../includes/header.php';
 ?>
+
+<?php if ($recentProblems > 0): ?>
+    <div class="alert alert-warning" role="status">
+        The system ran into <?= e(plural($recentProblems, 'error')) ?> in the last 24 hours.
+        <a href="<?= e(url('admin/system_log.php?level=problems')) ?>">Open the System Log</a>
+    </div>
+<?php endif; ?>
 
 <div class="stats">
     <div class="stat">

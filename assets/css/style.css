@@ -671,6 +671,29 @@ textarea:focus {
     max-width: 12rem;
 }
 
+/* A fixed tag in front of an input, e.g. the role tag of an employee number: [EMP][1024] */
+.input-prefix {
+    display: flex;
+    max-width: 16rem;
+}
+
+.input-prefix-tag {
+    display: flex;
+    align-items: center;
+    padding: 0 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--color-primary-text);
+    background: var(--color-primary-soft);
+    border: 1px solid #b9c4cf;
+    border-right: 0;
+    border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.input-prefix input {
+    border-radius: 0 var(--radius) var(--radius) 0;
+}
+
 .pin-input {
     font-size: 1.5rem;
     letter-spacing: 0.6em;
@@ -714,6 +737,12 @@ textarea:focus {
     flex-basis: 240px;
 }
 
+/* Error messages get their own line under the filter row, so the fields stay lined up. */
+.filters > .field-error {
+    flex-basis: 100%;
+    margin: 0;
+}
+
 /* ---------------------------------------------------------------- Tables */
 
 .table-wrap {
@@ -732,16 +761,16 @@ table {
 
 th,
 td {
-    padding: 0.7rem 0.9rem;
+    padding: 0.7rem 0.75rem;
     text-align: left;
     vertical-align: top;
     border-bottom: 1px solid var(--color-border);
 }
 
+/* Headers may wrap ("Evaluations / received"), so a wide table still fits its card. */
 thead th {
     background: var(--color-primary-soft);
     font-weight: 700;
-    white-space: nowrap;
 }
 
 tbody tr:nth-child(even) {
@@ -756,6 +785,12 @@ td.num,
 th.num {
     text-align: right;
     white-space: nowrap;
+}
+
+/* Notes such as "Not enough evaluations" in a number column may wrap; the numbers do not. */
+td.num .small,
+th.num {
+    white-space: normal;
 }
 
 td.actions-cell {
@@ -1241,6 +1276,40 @@ th.sorted-desc a::after {
     font-size: 0.85rem;
 }
 
+.error-ref {
+    font-size: 0.95rem;
+    color: var(--color-text-muted);
+}
+
+/* ---------------------------------------------------------------- System log */
+
+.log-message,
+.log-page {
+    overflow-wrap: anywhere;
+}
+
+.log-page {
+    font-size: 0.9rem;
+}
+
+.log-trace summary {
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #1f5a96;
+}
+
+.log-trace pre {
+    margin: 0.4rem 0 0;
+    padding: 0.6rem 0.75rem;
+    max-height: 18rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 0.8rem;
+    background: var(--color-surface-alt);
+    border-radius: var(--radius);
+}
+
 /* ---------------------------------------------------------------- Report page */
 
 .report-header {
@@ -1268,13 +1337,45 @@ th.sorted-desc a::after {
 
 /* ---------------------------------------------------------------- Responsive */
 
-@media (max-width: 1100px) {
+/* Laptops and small desktops: a narrower side menu, two-card rows stacked, and action
+   buttons that may wrap, so wide tables fit beside the menu and the Actions column stays
+   in view. */
+@media (max-width: 1280px) {
+    :root {
+        --sidebar-width: 220px;
+    }
+
+    .content {
+        padding: 1.5rem 1.5rem 3rem;
+    }
+
     .grid-2 {
         grid-template-columns: minmax(0, 1fr);
     }
+
+    td.actions-cell {
+        white-space: normal;
+    }
+
+    td.actions-cell .actions {
+        flex-wrap: wrap;
+    }
+
+    .card {
+        padding-left: 1.25rem;
+        padding-right: 1.25rem;
+    }
 }
 
-@media (max-width: 900px) {
+/* Tablets in landscape and small laptops: the side menu folds away behind the Menu button,
+   so the page gets the full width. */
+@media (max-width: 1100px) {
+    th,
+    td {
+        padding-left: 0.6rem;
+        padding-right: 0.6rem;
+    }
+
     .menu-toggle {
         display: inline-block;
     }
@@ -1296,6 +1397,149 @@ th.sorted-desc a::after {
         transform: translateX(0);
     }
 
+    /* Dims the page behind the open side menu; tapping it closes the menu (app.js). */
+    .nav-backdrop {
+        position: fixed;
+        inset: var(--topbar-height) 0 0 0;
+        z-index: 25;
+        background: rgba(30, 41, 53, 0.35);
+    }
+}
+
+/*
+ * Phones and tablets (on screen only, so printouts keep real tables): tables become a list
+ * of cards, one card per row and one "Label  value" line per cell. app.js marks the tables
+ * it prepared with .stackable (labels in data-label, the cell content in .cell-value);
+ * without JavaScript a table keeps its layout and scrolls sideways. The sortable column
+ * headers stay above the cards as "Sort by" buttons.
+ */
+@media screen and (max-width: 900px) {
+    .table-wrap.stackable {
+        overflow: visible;
+        border: 0;
+        border-radius: 0;
+        background: none;
+    }
+
+    .stackable table,
+    .stackable thead,
+    .stackable tbody,
+    .stackable tfoot,
+    .stackable tr {
+        display: block;
+    }
+
+    .stackable thead tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.4rem;
+        padding-bottom: 0.75rem;
+    }
+
+    .stackable thead tr::before {
+        content: "Sort by";
+        margin-right: 0.25rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--color-text-muted);
+    }
+
+    .stackable.no-sort thead,
+    .stackable thead th {
+        display: none;
+    }
+
+    .stackable thead th.sortable {
+        display: block;
+        padding: 0;
+        border: 0;
+        background: none;
+    }
+
+    .stackable thead th.sortable a {
+        min-height: 2.25rem;
+        padding: 0.3rem 0.8rem;
+        font-size: 0.9rem;
+        border: 1px solid var(--color-border);
+        border-radius: 999px;
+        background: var(--color-surface);
+    }
+
+    .stackable thead th.sorted-asc a,
+    .stackable thead th.sorted-desc a {
+        background: var(--color-primary-soft);
+        border-color: var(--color-primary-strong);
+    }
+
+    .stackable tbody tr,
+    .stackable tfoot tr {
+        margin-bottom: 0.75rem;
+        padding: 0.25rem 1rem;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+    }
+
+    .stackable tbody tr:nth-child(even) {
+        background: var(--color-surface);
+    }
+
+    .stackable tfoot tr {
+        background: var(--color-primary-soft);
+    }
+
+    .stackable td {
+        display: grid;
+        grid-template-columns: minmax(6.5rem, 38%) minmax(0, 1fr);
+        gap: 0.75rem;
+        align-items: start;
+        padding: 0.55rem 0;
+        text-align: left;
+        white-space: normal;
+        background: none;
+        border-bottom: 1px dashed var(--color-border);
+    }
+
+    .stackable td::before {
+        content: attr(data-label);
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--color-text-muted);
+    }
+
+    .stackable tr td:last-child {
+        border-bottom: 0;
+    }
+
+    .stackable tbody td:first-child .cell-value {
+        font-weight: 600;
+    }
+
+    /* Cells without a label (the actions, an "empty list" message) use the full width. */
+    .stackable td:not([data-label]) {
+        display: block;
+    }
+
+    .stackable td:not([data-label])::before {
+        content: none;
+    }
+
+    .stackable td.actions-cell .actions {
+        flex-wrap: wrap;
+    }
+
+    .stackable .empty-row td {
+        text-align: center;
+    }
+
+    .stackable .empty-row {
+        box-shadow: none;
+    }
+}
+
+@media (max-width: 900px) {
     .content {
         padding: 1.25rem 1rem 2.5rem;
     }
@@ -1342,6 +1586,12 @@ th.sorted-desc a::after {
 
     .filters .field {
         max-width: none;
+        flex-basis: 100%;
+    }
+
+    /* Filter buttons share a row instead of stacking one per line. */
+    .filters > .btn {
+        flex: 1 1 auto;
     }
 
     .rating-option {

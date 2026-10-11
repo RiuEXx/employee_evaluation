@@ -123,6 +123,37 @@ function get_int(string $key, int $default = 0): int
     return preg_match('/^-?\d+$/', $value) ? (int) $value : $default;
 }
 
+/** The search box text (?q=) without emoji, cut to SEARCH_MAX_LENGTH characters like the box itself. */
+function search_query(): string
+{
+    return mb_substr(trim(preg_replace(EMOJI_PATTERN, '', get_str('q')) ?? ''), 0, SEARCH_MAX_LENGTH);
+}
+
+/**
+ * Emoji and other picture symbols. Text fields take plain text only, so these
+ * are refused (assets/js/app.js uses the same pattern while typing).
+ * It matches pictographic characters from U+2300 up (so typographic signs
+ * such as the copyright and trademark signs stay allowed), flags, skin tones,
+ * keycaps and the variation selector that turns a character into an emoji.
+ */
+const EMOJI_PATTERN = '/(?=\p{Extended_Pictographic})[^\x{0000}-\x{22FF}]|[\x{1F1E6}-\x{1F1FF}\x{1F3FB}-\x{1F3FF}\x{FE0F}\x{20E3}\x{E0020}-\x{E007F}]/u';
+
+/** True when the text contains an emoji. */
+function has_emoji(string $text): bool
+{
+    return preg_match(EMOJI_PATTERN, $text) === 1;
+}
+
+/** Adds "No emoji" to $errors for each field in $values that has one (and no other error yet). */
+function reject_emoji(array $values, array &$errors): void
+{
+    foreach ($values as $field => $value) {
+        if (is_string($value) && !isset($errors[$field]) && has_emoji($value)) {
+            $errors[$field] = 'Emoji are not allowed. Use plain text only.';
+        }
+    }
+}
+
 /** A "contains" pattern for SQL LIKE, with the user's % and _ treated as plain text. */
 function like_pattern(string $text): string
 {
@@ -136,6 +167,30 @@ function is_valid_date(string $value): bool
         return false;
     }
     return checkdate((int) $m[2], (int) $m[3], (int) $m[1]);
+}
+
+/** True when $value is a real date from $min to $max (all written as YYYY-MM-DD). */
+function is_date_between(string $value, string $min, string $max): bool
+{
+    return is_valid_date($value) && $value >= $min && $value <= $max;
+}
+
+/** Today's date as YYYY-MM-DD, in the application timezone. */
+function today_date(): string
+{
+    return date('Y-m-d');
+}
+
+/** Latest date an evaluation period may use: today plus PERIOD_MAX_AHEAD. */
+function period_max_date(): string
+{
+    return date('Y-m-d', strtotime(PERIOD_MAX_AHEAD));
+}
+
+/** "Choose a date from Jan 1, 2000 to Oct 11, 2026." */
+function date_range_message(string $min, string $max): string
+{
+    return 'Choose a date from ' . format_date($min) . ' to ' . format_date($max) . '.';
 }
 
 // ---------------------------------------------------------------------------
@@ -201,22 +256,15 @@ function audit_log(string $action, string $details = '', ?int $employeeId = null
         $employeeId = (int) $_SESSION['employee_id'];
     }
     $stmt = db()->prepare(
-        'INSERT INTO audit_logs (employee_id, employee_number, action, details, ip_address)
-         VALUES (?, ?, ?, ?, ?)'
+        'INSERT INTO audit_logs (employee_id, employee_number, action, details)
+         VALUES (?, ?, ?, ?)'
     );
     $stmt->execute([
         $employeeId,
         $employeeNumber !== null ? mb_substr($employeeNumber, 0, 20) : null,
         $action,
         mb_substr($details, 0, 500),
-        client_ip(),
     ]);
-}
-
-/** The visitor's IP address. Proxy headers are ignored because they can be faked. */
-function client_ip(): string
-{
-    return substr($_SERVER['REMOTE_ADDR'] ?? 'unknown', 0, 45);
 }
 
 // ---------------------------------------------------------------------------
@@ -500,6 +548,8 @@ function render_error_page(int $code, string $message = ''): void
     http_response_code($code);
     $pageTitle = $titles[$code] ?? 'Error';
     $errorMessage = $message !== '' ? $message : ($messages[$code] ?? 'Something went wrong.');
+    // A missing page is only a notice (often an old bookmark); refused access is worth a closer look.
+    system_log($code === 404 ? 'notice' : 'warning', $code . ' ' . $pageTitle . ($message !== '' ? ': ' . $message : '.'));
     $user = current_user();
     $layout = $user ? 'app' : 'plain';
 
@@ -527,10 +577,12 @@ function render_error_page(int $code, string $message = ''): void
  */
 function handle_uncaught_exception(Throwable $ex): void
 {
-    error_log('[employee_evaluation] ' . $ex);
-
     $isDbDown = $ex instanceof PDOException
         && preg_match('/\[(2002|2006|1044|1045|1049)\]/', $ex->getMessage());
+    $ref = system_log($isDbDown ? 'critical' : 'error', get_class($ex) . ': ' . $ex->getMessage(), [
+        'where' => log_short_path($ex->getFile()) . ':' . $ex->getLine(),
+        'trace' => $ex->getTraceAsString(),
+    ]);
     $message = $isDbDown
         ? 'The application cannot reach its database. Check that MySQL is running in the XAMPP Control Panel, '
           . 'that database/schema.sql has been imported, and that config/db.php has the right settings.'
@@ -547,7 +599,9 @@ function handle_uncaught_exception(Throwable $ex): void
         . '<link rel="stylesheet" href="' . e(asset('css/style.css')) . '">'
         . '<link rel="icon" type="image/svg+xml" href="' . e(asset('img/favicon.svg')) . '"></head>'
         . '<body class="plain"><main class="plain-main"><section class="card error-card">'
-        . '<h1 class="page-title">Something went wrong</h1><p>' . e($message) . '</p>' . $detail
+        . '<h1 class="page-title">Something went wrong</h1><p>' . e($message) . '</p>'
+        . '<p class="error-ref">Reference: <strong>' . e($ref) . '</strong>. Give this code to HR: the System Log has the details.</p>'
+        . $detail
         . '<p class="actions"><a class="btn btn-primary" href="' . e(url('index.php')) . '">Back to the start page</a></p>'
         . '</section></main></body></html>';
     exit;

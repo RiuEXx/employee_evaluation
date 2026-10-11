@@ -38,7 +38,7 @@ if ($period) {
     }
 }
 
-$q = get_str('q');
+$q = search_query();
 if ($q !== '') {
     $rows = array_values(array_filter($rows, fn($r) => mb_stripos($r['name'], $q) !== false));
 }
@@ -62,7 +62,7 @@ require __DIR__ . '/../includes/header.php';
         <?= period_select_field($periods, $period) ?>
         <div class="field">
             <label for="q">Search</label>
-            <input type="search" id="q" name="q" value="<?= e($q) ?>" placeholder="Department name">
+            <input type="search" id="q" name="q" value="<?= e($q) ?>" maxlength="<?= SEARCH_MAX_LENGTH ?>" placeholder="Department name">
         </div>
         <button type="submit" class="btn btn-secondary">Apply</button>
     </form>
@@ -78,13 +78,14 @@ require __DIR__ . '/../includes/header.php';
                 <?= sort_th('Average', 'average', $sort, 'num') ?>
                 <th scope="col">Highest category</th>
                 <th scope="col">Lowest category</th>
+                <th scope="col" class="no-print">Action</th>
             </tr>
             </thead>
             <tbody>
             <?php foreach ($pageRows as $row): ?>
                 <tr>
                     <td>
-                        <a href="<?= e(url('ceo/department.php?id=' . $row['id'] . '&period=' . (int) $period['id'])) ?>"><?= e($row['name']) ?></a>
+                        <?= e($row['name']) ?>
                         <?php if (!$row['is_active']): ?> <?= status_badge('inactive') ?><?php endif; ?>
                     </td>
                     <td class="num"><?= (int) $row['employees'] ?></td>
@@ -93,10 +94,13 @@ require __DIR__ . '/../includes/header.php';
                     <td class="num"><?= score_badge($row['overall']) ?></td>
                     <td><?= e($row['best'] ?? '-') ?></td>
                     <td><?= e($row['worst'] ?? '-') ?></td>
+                    <td class="actions-cell no-print">
+                        <a class="btn btn-secondary btn-small" href="<?= e(url('ceo/department.php?id=' . $row['id'] . '&period=' . (int) $period['id'])) ?>">View</a>
+                    </td>
                 </tr>
             <?php endforeach; ?>
             <?php if (!$pageRows): ?>
-                <tr class="empty-row"><td colspan="7">No departments match your search.</td></tr>
+                <tr class="empty-row"><td colspan="8">No departments match your search.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>

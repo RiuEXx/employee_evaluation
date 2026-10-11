@@ -8,3 +8,7 @@ desktop.ini
 # Logs and local exports
 *.log
 *.csv
+
+# System log files (the folder itself and its .htaccess stay in the repository)
+logs/*
+!logs/.htaccess

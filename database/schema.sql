@@ -46,17 +46,19 @@ CREATE TABLE departments (
   COMMENT = 'Groups of employees. Employees evaluate the mates in their own department.';
 
 CREATE TABLE roles (
-    id          INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-    name        VARCHAR(50)   NOT NULL,
-    description VARCHAR(255)  NULL,
-    is_system   TINYINT(1)    NOT NULL DEFAULT 0,
+    id            INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    name          VARCHAR(50)   NOT NULL,
+    number_prefix VARCHAR(5)    NOT NULL,
+    description   VARCHAR(255)  NULL,
+    is_system     TINYINT(1)    NOT NULL DEFAULT 0,
 
     CONSTRAINT PK_roles PRIMARY KEY (id),
-    CONSTRAINT UQ_roles_name UNIQUE (name)
+    CONSTRAINT UQ_roles_name UNIQUE (name),
+    CONSTRAINT CHK_roles_number_prefix CHECK (number_prefix REGEXP '^[A-Za-z]{2,5}$')
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci
-  COMMENT = 'User roles. is_system = 1 marks the built-in roles, which cannot be deleted.';
+  COMMENT = 'User roles. number_prefix is the tag that starts the employee numbers of the role (CEO1001, ADM1002, EMP1003). is_system = 1 marks the built-in roles, which cannot be deleted.';
 
 CREATE TABLE permissions (
     id          INT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -288,7 +290,6 @@ CREATE TABLE audit_logs (
     employee_number VARCHAR(20)     NULL,
     action          VARCHAR(50)     NOT NULL,
     details         VARCHAR(500)    NULL,
-    ip_address      VARCHAR(45)     NULL,
     created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT PK_audit_logs PRIMARY KEY (id),
@@ -328,10 +329,11 @@ CREATE TABLE settings (
 -- 6. SEED DATA: roles and permissions
 -- =============================================================================
 
-INSERT INTO roles (id, name, description, is_system) VALUES
-    (1, 'CEO',      'Views all results, summaries, statistics and reports.', 1),
-    (2, 'Admin',    'Human Resources administrator: manages the organisation, periods and accounts.', 1),
-    (3, 'Employee', 'Evaluates department mates and sees their own summary.', 1);
+-- number_prefix is the tag that starts each employee number of the role.
+INSERT INTO roles (id, name, number_prefix, description, is_system) VALUES
+    (1, 'CEO',      'CEO', 'Views all results, summaries, statistics and reports.', 1),
+    (2, 'Admin',    'ADM', 'Human Resources administrator: manages the organisation, periods and accounts.', 1),
+    (3, 'Employee', 'EMP', 'Evaluates department mates and sees their own summary.', 1);
 
 INSERT INTO permissions (code, description, group_name, sort_order) VALUES
     ('results.view',        'View all evaluation results, summaries and statistics',      'Results',        10),
@@ -341,12 +343,13 @@ INSERT INTO permissions (code, description, group_name, sort_order) VALUES
     ('evaluations.receive', 'Can be evaluated by the other employees in their department','Evaluations',   50),
     ('summary.view_own',    'View their own results summary (when Settings allow it)',   'Evaluations',    60),
     ('departments.manage',  'Add, edit and deactivate departments',                      'Administration', 70),
-    ('employees.manage',    'Add, edit, import, activate and deactivate employees',      'Administration', 80),
+    ('employees.manage',    'Add, edit, import, activate and deactivate employees; see employee numbers', 'Administration', 80),
     ('pins.reset',          'Reset employee PINs and unlock locked accounts',            'Administration', 90),
     ('categories.manage',   'Manage rating categories and criteria',                     'Administration', 100),
     ('periods.manage',      'Create, open and close evaluation periods',                 'Administration', 110),
     ('roles.manage',        'Change which permissions each role has',                    'Administration', 120),
     ('audit.view',          'View the audit log',                                        'Administration', 130),
+    ('system_log.view',     'View the system log (errors and other problems)',           'Administration', 135),
     ('settings.manage',     'Change system settings',                                    'Administration', 140);
 
 -- CEO: results only. The CEO is not evaluated (no evaluations.receive);
@@ -362,7 +365,7 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT 2, id FROM permissions
 WHERE code IN ('completion.view', 'evaluations.submit', 'evaluations.receive', 'summary.view_own',
                'departments.manage', 'employees.manage', 'pins.reset', 'categories.manage',
-               'periods.manage', 'roles.manage', 'audit.view', 'settings.manage');
+               'periods.manage', 'roles.manage', 'audit.view', 'system_log.view', 'settings.manage');
 
 -- Employee: evaluate department mates and see their own summary.
 INSERT INTO role_permissions (role_id, permission_id)
@@ -410,6 +413,8 @@ INSERT INTO settings (setting_key, setting_value, label, description, input_type
 -- 8. SEED DATA: departments and employees
 -- PIN for every account: 1234 (hash below). must_change_pin = 1 forces a new
 -- PIN at first login.
+-- Employee numbers start with a tag for the role: CEO for the CEO, ADM for the
+-- Admin (HR), EMP for employees.
 -- =============================================================================
 
 INSERT INTO departments (id, name, description) VALUES
@@ -422,9 +427,9 @@ INSERT INTO employees
     (id, employee_number, first_name, last_name, email, position, department_id, role_id, pin_hash, must_change_pin, status, date_hired)
 VALUES
     -- Leadership
-    (1,  'EMP1001', 'Benjamin', 'Alvarado',   'benjamin.alvarado@evergreen.example',  'Chief Executive Officer',     NULL, 1, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2012-01-09'),
+    (1,  'CEO1001', 'Benjamin', 'Alvarado',   'benjamin.alvarado@evergreen.example',  'Chief Executive Officer',     NULL, 1, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2012-01-09'),
     -- Human Resources (the HR Manager is the system Admin)
-    (2,  'EMP1002', 'James',    'Caporal',    'james.caporal@evergreen.example',      'HR Manager',                  1,    2, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2015-06-15'),
+    (2,  'ADM1002', 'James',    'Caporal',    'james.caporal@evergreen.example',      'HR Manager',                  1,    2, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2015-06-15'),
     (3,  'EMP1003', 'Aron',     'Angeles',    'aron.angeles@evergreen.example',       'Recruitment Specialist',      1,    3, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2019-02-04'),
     (4,  'EMP1004', 'Liuri',    'Cosme',      'liuri.cosme@evergreen.example',        'Training Coordinator',        1,    3, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2020-08-17'),
     (5,  'EMP1005', 'Abraham',  'Buquid',     'abraham.buquid@evergreen.example',     'Compensation and Benefits Officer', 1, 3, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2018-11-05'),

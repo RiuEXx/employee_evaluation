@@ -37,6 +37,9 @@ function csrf_verify_request(): void
 
     // An upload larger than post_max_size also arrives with an empty $_POST.
     $tooLarge = empty($_POST) && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0;
+    system_log('warning', $tooLarge
+        ? 'Form refused: the upload (' . (int) $_SERVER['CONTENT_LENGTH'] . ' bytes) is larger than post_max_size.'
+        : 'Form refused: its security token was missing or expired.');
     flash('error', $tooLarge
         ? 'The file you sent is too large.'
         : 'The form has expired or is invalid. Please try again.');

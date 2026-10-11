@@ -167,6 +167,53 @@ function find_employee(int $id): ?array
     return $stmt->fetch() ?: null;
 }
 
+// ---------------------------------------------------------------------------
+// Employee numbers: the role's tag followed by digits, e.g. CEO1001, ADM1002,
+// EMP1003. The tag is roles.number_prefix, so it always matches the role; the
+// digits are unique on their own, so a change of role (EMP1005 becomes
+// ADM1005) never takes a number someone else has.
+// ---------------------------------------------------------------------------
+
+/**
+ * Employee numbers are shown only to people who manage employees (HR). Other
+ * users, the CEO included, see names only.
+ */
+function can_see_employee_numbers(): bool
+{
+    return can('employees.manage');
+}
+
+/** The digits of a tagged employee number ("ADM1002" gives "1002"), or '' for any other format. */
+function employee_number_digits(string $number): string
+{
+    return preg_match('/^[A-Za-z]{2,5}(\d{' . EMPLOYEE_NUMBER_MIN_DIGITS . ',6})$/', $number, $m) ? $m[1] : '';
+}
+
+/** The next free digits: one more than the highest number in use, e.g. "1024". */
+function next_employee_digits(): string
+{
+    $highest = 1000; // the first employee gets 1001
+    foreach (db()->query('SELECT employee_number FROM employees')->fetchAll(PDO::FETCH_COLUMN) as $number) {
+        if (preg_match('/(\d+)$/', $number, $m)) {
+            $highest = max($highest, (int) $m[1]);
+        }
+    }
+    return str_pad((string) ($highest + 1), EMPLOYEE_NUMBER_MIN_DIGITS, '0', STR_PAD_LEFT);
+}
+
+/** Why $digits cannot be used for an employee number, or '' when it can. $exceptId is the employee being edited. */
+function employee_digits_problem(string $digits, int $exceptId = 0): string
+{
+    if (!preg_match('/^\d{' . EMPLOYEE_NUMBER_MIN_DIGITS . ',6}$/', $digits)) {
+        return 'Enter ' . EMPLOYEE_NUMBER_MIN_DIGITS . ' to 6 digits, for example ' . next_employee_digits() . '.';
+    }
+    // "1005" and "01005" count as the same number.
+    $stmt = db()->prepare('SELECT employee_number FROM employees WHERE id <> ? AND employee_number REGEXP ? LIMIT 1');
+    $stmt->execute([$exceptId, '^[A-Za-z]+0*' . ltrim($digits, '0') . '$']);
+    $taken = $stmt->fetchColumn();
+    return $taken !== false ? 'The number ' . $digits . ' is already used by ' . $taken . '.' : '';
+}
+
 /** Every category (active or not) keyed by id, in display order. */
 function categories_map(): array
 {
@@ -348,6 +395,8 @@ function read_rating_input(array $categories): array
     $comment = post_str('overall_comment');
     if (mb_strlen($comment) > 2000) {
         $errors['overall_comment'] = 'The comment can be at most 2000 characters.';
+    } elseif (has_emoji($comment)) {
+        $errors['overall_comment'] = 'Emoji are not allowed. Use plain text only.';
     } elseif ($comment === '' && setting_bool('require_comments')) {
         $errors['overall_comment'] = 'A comment is required.';
     }

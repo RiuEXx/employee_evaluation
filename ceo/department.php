@@ -67,10 +67,12 @@ foreach (array_unique($memberIds) as $id) {
 }
 $rows = add_ranks(sort_rows($rows, 'overall', 'desc'), 'overall');
 
-$q = get_str('q');
+$q = search_query();
 if ($q !== '') {
+    // Employee numbers are searchable only for people who manage employees.
+    $searchNumbers = can_see_employee_numbers();
     $rows = array_values(array_filter($rows, fn($r) =>
-        mb_stripos($r['name'] . ' ' . $r['position'] . ' ' . $r['employee_number'], $q) !== false));
+        mb_stripos($r['name'] . ' ' . $r['position'] . ($searchNumbers ? ' ' . $r['employee_number'] : ''), $q) !== false));
 }
 $sort = sort_state(['rank' => 'rank', 'name' => 'sort_name', 'evaluations' => 'evaluations', 'score' => 'overall'], 'rank');
 $rows = sort_rows($rows, $sort['column'], $sort['dir']);
@@ -175,7 +177,7 @@ $trendIndexes = array_keys(array_filter($deptTrend, fn($t) => $t['evaluations'] 
             <input type="hidden" name="period" value="<?= $periodId ?>">
             <div class="field">
                 <label for="q" class="visually-hidden">Search employees</label>
-                <input type="search" id="q" name="q" value="<?= e($q) ?>" placeholder="Search employees">
+                <input type="search" id="q" name="q" value="<?= e($q) ?>" maxlength="<?= SEARCH_MAX_LENGTH ?>" placeholder="Search employees">
             </div>
             <button type="submit" class="btn btn-secondary">Search</button>
         </form>
@@ -190,6 +192,7 @@ $trendIndexes = array_keys(array_filter($deptTrend, fn($t) => $t['evaluations'] 
                 <?= sort_th('Evaluations received', 'evaluations', $sort, 'num') ?>
                 <?= sort_th('Score', 'score', $sort, 'num') ?>
                 <th scope="col">Evaluations given</th>
+                <th scope="col" class="no-print">Action</th>
             </tr>
             </thead>
             <tbody>
@@ -197,7 +200,7 @@ $trendIndexes = array_keys(array_filter($deptTrend, fn($t) => $t['evaluations'] 
                 <tr>
                     <td class="num"><?= $row['rank'] !== null ? (int) $row['rank'] : '-' ?></td>
                     <td>
-                        <a href="<?= e(url('ceo/employee.php?id=' . (int) $row['id'] . '&period=' . $periodId)) ?>"><?= e($row['name']) ?></a>
+                        <?= e($row['name']) ?>
                         <?php if ($row['status'] !== 'active'): ?> <?= status_badge('inactive') ?><?php endif; ?>
                         <?php if ((int) $row['department_id'] !== $deptId): ?><br><span class="muted small">Now in <?= e($row['department_name'] ?? 'no department') ?></span><?php endif; ?>
                     </td>
@@ -209,10 +212,13 @@ $trendIndexes = array_keys(array_filter($deptTrend, fn($t) => $t['evaluations'] 
                             : '<span class="muted small">' . e(not_enough_text((int) $row['evaluations'])) . '</span>' ?>
                     </td>
                     <td><?= $row['given'] ? e($row['given']['done'] . ' of ' . $row['given']['expected']) : '<span class="muted">-</span>' ?></td>
+                    <td class="actions-cell no-print">
+                        <a class="btn btn-secondary btn-small" href="<?= e(url('ceo/employee.php?id=' . (int) $row['id'] . '&period=' . $periodId)) ?>">View</a>
+                    </td>
                 </tr>
             <?php endforeach; ?>
             <?php if (!$pageRows): ?>
-                <tr class="empty-row"><td colspan="6">No employees to show.</td></tr>
+                <tr class="empty-row"><td colspan="7">No employees to show.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>

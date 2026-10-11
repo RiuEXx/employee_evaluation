@@ -13,6 +13,11 @@ $layout = $layout ?? 'app';
 $navUser = $layout === 'app' ? current_user() : null;
 $companyName = setting('company_name', '');
 
+// Who is logged in, for app.js: other open tabs reload when this changes (login, logout,
+// another account), so none of them keeps a page whose forms the server would refuse.
+$sessionUser = current_user();
+$sessionState = $sessionUser ? 'user-' . (int) $sessionUser['id'] : 'none';
+
 /** Navigation entries: [label, path, permission codes (any of), extra condition]. */
 $navGroups = [];
 if ($navUser) {
@@ -37,6 +42,7 @@ if ($navUser) {
             ['Evaluation Periods', 'admin/periods.php', ['periods.manage'], true],
             ['Roles and Permissions', 'admin/roles.php', ['roles.manage'], true],
             ['Audit Log', 'admin/audit_log.php', ['audit.view'], true],
+            ['System Log', 'admin/system_log.php', ['system_log.view'], true],
             ['Settings', 'admin/settings.php', ['settings.manage'], true],
         ],
         'Account' => [
@@ -59,7 +65,7 @@ $navActive = $navActive ?? $currentPath;
     <link rel="stylesheet" href="<?= e(asset('css/style.css')) ?>">
     <link rel="icon" type="image/svg+xml" href="<?= e(asset('img/favicon.svg')) ?>">
 </head>
-<body class="<?= $layout === 'plain' ? 'plain' : 'app' ?>">
+<body class="<?= $layout === 'plain' ? 'plain' : 'app' ?>" data-session="<?= e($sessionState) ?>">
 <a class="skip-link" href="#main">Skip to main content</a>
 
 <?php if ($layout === 'plain'): ?>

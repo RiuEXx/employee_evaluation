@@ -7,8 +7,10 @@ HTML, CSS and a little vanilla JavaScript. It runs on XAMPP, WAMP or LAMP.
   department, once per evaluation period. Nobody can evaluate themselves or another department.
 - The CEO sees results, statistics, charts, trends, a printable report and CSV exports.
 - HR (Admin) manages departments, employees, rating categories, evaluation periods, PINs, roles and
-  permissions, settings, and the audit log.
+  permissions, settings, the audit log (who did what) and the system log (what went wrong).
 - Login is an Employee Number plus a 4-digit PIN.
+- Works on desktop, tablet and phone: on small screens the menu folds away and every table turns
+  into a list of cards.
 
 ---
 
@@ -68,6 +70,10 @@ No internet connection is needed: Chart.js is included in `assets/vendor/`.
    ```
 
    Importing `schema.sql` again deletes and re-creates the whole database (a clean reset).
+
+   **Already have the database from an older version?** Import `database/upgrade.sql` instead. It
+   brings the database up to date and keeps all data (it is safe to run twice). Note that it gives
+   employee numbers their role's tag, so the CEO and Admin log in with `CEO1001` / `ADM1002` after it.
 4. **Check `config/db.php`.** The defaults match a fresh XAMPP install (host `127.0.0.1`, port
    `3306`, user `root`, no password). Change them if your server is different.
 5. **Open** <http://localhost/employee_evaluation/> and log in with one of the accounts below.
@@ -77,12 +83,14 @@ If you put the project in a folder with another name, it still works; only the t
 
 ## 3. Default logins
 
-Every account starts with the PIN **1234** and must choose a new PIN at first login.
+Every account starts with the PIN **1234** and must choose a new PIN at first login. Employee
+numbers start with the tag of the role: `CEO` for the CEO, `ADM` for the Admin (HR), `EMP` for
+employees. The tag is stored with the role (`roles.number_prefix`) and always matches it.
 
 | Role | Employee Number | Name | Department |
 |---|---|---|---|
-| CEO | `EMP1001` | Benjamin Alvarado | (none) |
-| Admin (HR) | `EMP1002` | James Caporal, HR Manager | Human Resources |
+| CEO | `CEO1001` | Benjamin Alvarado | (none) |
+| Admin (HR) | `ADM1002` | James Caporal, HR Manager | Human Resources |
 | Employee | `EMP1003` to `EMP1006` | Aron Angeles, Liuri Cosme, Abraham Buquid, Kristine Ramos | Human Resources |
 | Employee | `EMP1007` to `EMP1011` | Miguel Torres, Andrea Cruz, Paolo Garcia, Bianca Flores, Daniel Aquino | Finance |
 | Employee | `EMP1012` to `EMP1017` | Mark Dela Cruz, Sofia Reyes, Gabriel Santos, Camille Tan, Joshua Castillo, Nicole Gonzales | Information Technology |
@@ -122,10 +130,10 @@ default; its numbers can still change.
   department averages, the company average per category, the top performers, and the company
   trend across periods.
 - **Departments**: every department with its average, completion rate, and highest and lowest
-  category. Click a department for its category averages next to the company's, the **ranking** of
-  its employees, and its trend.
+  category. **View** a department for its category averages next to the company's, the **ranking**
+  of its employees, and its trend.
 - **Employees**: every employee's score, number of evaluations received, and how many colleagues
-  they evaluated, with search, department and status filters, and sorting. Click an employee for:
+  they evaluated, with search, department and status filters, and sorting. **View** an employee for:
   - average per category next to the department and company averages (table and radar chart),
   - the number of evaluators,
   - anonymous comments,
@@ -139,10 +147,15 @@ default; its numbers can still change.
 Scores of an employee with fewer than 3 evaluations stay hidden everywhere (shown as *Not enough
 evaluations*), so that no single evaluator can be identified.
 
+Employee numbers are not shown on the CEO pages or in the CSV exports: only HR, who manages the
+accounts, sees them (the `employees.manage` permission). The same goes for employees, who see their
+colleagues by name only.
+
 ## 6. User guide: Admin (HR)
 
 - **Admin Dashboard**: account counts, locked accounts, PINs still to be changed, progress of the
-  open period, shortcuts and recent activity.
+  open period, shortcuts and recent activity, plus a warning when the system ran into errors in the
+  last 24 hours.
 - **Departments**: add, edit, activate or deactivate. Members of an inactive department do not take
   part in evaluations. A department with employees or evaluations cannot be deleted.
 - **Employees**: search and filter; **Add employee**; **Edit** (department, role, status, and so
@@ -150,9 +163,14 @@ evaluations*), so that no single evaluator can be identified.
   **Unlock** a locked account; **Activate / Deactivate** (an inactive employee cannot log in, and
   their past evaluations are kept). An employee with evaluations cannot be deleted. When an
   employee changes department, the evaluations already submitted keep the old department.
-- **Import from CSV**: download the template, fill it in, upload it. Columns: `employee_number`,
-  `first_name`, `last_name` (required) and `email`, `position`, `department`, `role`,
-  `date_hired` (YYYY-MM-DD). The whole file is checked first; if any row has a problem nothing is
+- **Employee numbers** are the role's tag plus digits. **Add employee** fills in the next free
+  number; you only type the digits. The tag follows the role: changing someone from Employee to
+  Admin turns `EMP1005` into `ADM1005` (the page tells you, since they then log in with the new
+  number). The digits are unique across all roles.
+- **Import from CSV**: download the template, fill it in, upload it. Columns: `first_name`,
+  `last_name` (required) and `employee_number`, `email`, `position`, `department`, `role`,
+  `date_hired` (YYYY-MM-DD). An employee number must start with its role's tag; leave it empty to
+  get the next free number. The whole file is checked first; if any row has a problem nothing is
   imported and every problem is listed by row. Comma and semicolon files both work.
 - **Categories**: add, edit, reorder, set the **weight** and whether *Not applicable* is allowed.
   **Manage criteria** adds specific rating items inside a category. A category or criterion that
@@ -163,8 +181,14 @@ evaluations*), so that no single evaluator can be identified.
 - **Roles and Permissions**: a grid of roles and permissions. For example, tick `results.view` for
   Admin to let HR see results, or tick `evaluations.receive` for CEO (and give the CEO a
   department) to have the CEO evaluated. You cannot remove `roles.manage` from your own role.
+  A new role needs a **number tag** (2 to 5 letters, e.g. `SUP`), which cannot be changed later.
 - **Audit Log**: logins, failed logins, lockouts, PIN changes and resets, session timeouts, and
   every change made in Administration, with search, action and date filters.
+- **System Log**: problems the system ran into: crashes, PHP errors and warnings, a database that
+  could not be reached, refused forms, denied access and missing pages, with the page, the user and
+  (for crashes) the stack trace. When a user sees "Something went wrong", the page shows a
+  **reference code**; search for it here. Filter by level (*Critical and errors* shows only the
+  serious ones), date and text. Entries are kept for 30 days.
 - **Settings**: see the next section.
 
 ## 7. How scores are calculated
@@ -216,7 +240,9 @@ Pages check **permissions**, which are stored in the database (`permissions` and
 | `evaluations.submit`: evaluate department mates | | Yes | Yes |
 | `evaluations.receive`: be evaluated | | Yes | Yes |
 | `summary.view_own`: My Summary | | Yes | Yes |
-| `departments.manage`, `employees.manage`, `pins.reset`, `categories.manage`, `periods.manage`, `roles.manage`, `audit.view`, `settings.manage` | | Yes | |
+| `departments.manage`, `employees.manage`, `pins.reset`, `categories.manage`, `periods.manage`, `roles.manage`, `audit.view`, `system_log.view`, `settings.manage` | | Yes | |
+
+`employees.manage` also decides who sees employee numbers.
 
 ## 10. Security
 
@@ -236,6 +262,16 @@ Pages check **permissions**, which are stored in the database (`permissions` and
 - The database enforces the rules as well: one evaluation per evaluator, evaluatee and period;
   no self-evaluation; scores 1 to 5; only one open period.
 - CSV exports are protected against formula injection in Excel.
+- Input is checked while typing and again on the server. Number fields accept digits only (no
+  sign, `e` or symbols). Text fields take plain text only: emoji are removed while typing and
+  refused by the server. Dates must be from `MIN_DATE` (2000-01-01, in `config/constants.php`) to
+  today; evaluation periods may be planned up to one year ahead. Search boxes take at most
+  `SEARCH_MAX_LENGTH` (50) characters. Neither log stores IP addresses.
+- The system log is written to files in `logs/` (so a database failure is still recorded). Each
+  file starts with a line of PHP that stops it from being served, and `logs/.htaccess` blocks the
+  folder as well.
+- Open tabs follow the login: logging in, logging out or switching account in one tab reloads the
+  other tabs of the system, so none of them keeps a page whose forms would be refused.
 
 ## 11. Project structure
 
@@ -250,7 +286,8 @@ employee_evaluation/
     constants.php      Fixed settings: timezone, rating scale, page size
     db.php             Database connection (PDO)
   includes/
-    bootstrap.php      Loaded by every page: session, timeout, CSRF check
+    bootstrap.php      Loaded by every page: error handling, session, timeout, CSRF check
+    logger.php         System log: writes and reads logs/system-YYYY-MM-DD.log.php
     auth.php           Login, lockout, session, permission checks
     csrf.php           CSRF tokens
     functions.php      Escaping, URLs, settings, audit log, sorting, paging
@@ -260,16 +297,18 @@ employee_evaluation/
   employee/            My Evaluations, evaluation form, My Summary
   ceo/                 Overview, departments, employees, completion, report, CSV export
   admin/               Dashboard, departments, employees, CSV import, categories,
-                       criteria, periods, roles, audit log, settings
+                       criteria, periods, roles, audit log, system log, settings
+  logs/                System log files (not in Git; must be writable by the web server)
   assets/
     css/style.css      All styles; pastel colours as CSS variables
-    js/app.js          Small helpers: PIN fields, confirmations, mobile menu
+    js/app.js          Small helpers: input checks, confirmations, mobile menu, table cards
     js/charts.js       Draws the charts from JSON written by PHP
     vendor/            Chart.js 4.4.7
     img/favicon.svg
   database/
     schema.sql         Database, tables, indexes, starting data
     seed.sql           Optional sample evaluation history
+    upgrade.sql        Updates a database from an older version, keeping its data
 ```
 
 ## 12. Troubleshooting
@@ -277,9 +316,12 @@ employee_evaluation/
 | Problem | Fix |
 |---|---|
 | "The application cannot reach its database" | Start MySQL in XAMPP, import `database/schema.sql`, and check `config/db.php`. |
+| "Something went wrong" with a reference code | Log in as HR, open **System Log**, and search for the code: the entry shows the error, the page and the file. |
+| System Log says it cannot write to `logs` | Give the web server write access to the `logs` folder (on XAMPP for Windows it normally has it). |
+| An old login such as `EMP1001` no longer works | The database was upgraded: numbers now carry the role's tag (`CEO1001`, `ADM1002`). |
 | MySQL does not start in XAMPP | Another MySQL server is probably using port 3306. Stop it, or run XAMPP's MySQL on another port and set that port in `config/db.php`. |
 | "Account locked" | Wait for the lockout to end, or log in as HR and use **Unlock** on the Employees page. |
 | Forgot the HR or CEO PIN and nobody can reset it | Re-import `database/schema.sql` (this resets all data), or set `must_change_pin = 1` and copy another account's `pin_hash` in phpMyAdmin. |
 | Charts do not appear | Make sure `assets/vendor/chart.umd.min.js` exists and JavaScript is enabled. The numbers are always in the tables too. |
-| "The form has expired" | The page was open too long or you logged in again in another tab. Reload and try again. |
+| "The form has expired" | The page was open too long (the session timed out). Reload and try again. Other tabs reload by themselves after a login or logout, unless the browser blocks site storage. |
 | Times are off by some hours | Set your timezone in `APP_TIMEZONE` in `config/constants.php` (default `Asia/Manila`). |

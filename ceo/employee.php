@@ -30,7 +30,9 @@ require __DIR__ . '/../includes/header.php';
 
 <section class="card">
     <dl class="details">
-        <dt>Employee number</dt><dd><?= e($employee['employee_number']) ?></dd>
+        <?php if (can_see_employee_numbers()): ?>
+            <dt>Employee number</dt><dd><?= e($employee['employee_number']) ?></dd>
+        <?php endif; ?>
         <dt>Position</dt><dd><?= e($employee['position'] ?: '-') ?></dd>
         <dt>Department</dt><dd><?= e($employee['department_name'] ?? 'No department') ?></dd>
         <dt>Role</dt><dd><?= e($employee['role_name']) ?></dd>
@@ -228,18 +230,26 @@ function diff_text(?float $a, ?float $b): string
                     <th scope="col" class="num">Score</th>
                     <th scope="col" class="num">Department average</th>
                     <th scope="col" class="num">Change</th>
+                    <th scope="col" class="no-print">Action</th>
                 </tr>
                 </thead>
                 <tbody>
                 <?php $previous = null; ?>
                 <?php foreach ($trendRows as $r): ?>
                     <tr>
-                        <td><a href="<?= e(url('ceo/employee.php?id=' . $empId . '&period=' . (int) $r['period']['id'])) ?>"><?= e($r['period']['title']) ?></a></td>
+                        <td><?= e($r['period']['title']) ?></td>
                         <td><?= e($r['department']) ?></td>
                         <td class="num"><?= (int) $r['evaluations'] ?></td>
                         <td class="num"><?= $r['overall'] !== null ? score_badge($r['overall']) : '<span class="muted small">Not enough</span>' ?></td>
                         <td class="num"><?= format_score($r['dept_avg']) ?></td>
                         <td class="num"><?= diff_text($r['overall'], $previous) ?></td>
+                        <td class="actions-cell no-print">
+                            <?php if ((int) $r['period']['id'] === $periodId): ?>
+                                <span class="muted small">Shown above</span>
+                            <?php else: ?>
+                                <a class="btn btn-secondary btn-small" href="<?= e(url('ceo/employee.php?id=' . $empId . '&period=' . (int) $r['period']['id'])) ?>">View</a>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                     <?php if ($r['overall'] !== null) { $previous = $r['overall']; } ?>
                 <?php endforeach; ?>

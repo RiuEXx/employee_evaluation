@@ -11,26 +11,42 @@ $user = require_permission('audit.view');
 
 $actions = db()->query('SELECT DISTINCT action FROM audit_logs ORDER BY action')->fetchAll(PDO::FETCH_COLUMN);
 
-$q = get_str('q');
+$q = search_query();
 $action = get_str('action');
 $from = get_str('from');
 $to = get_str('to');
 
+// The date filter runs from the day of the first entry (never before MIN_DATE) to today.
+$firstDay = (string) db()->query('SELECT DATE(MIN(created_at)) FROM audit_logs')->fetchColumn();
+$minDate = max(MIN_DATE, $firstDay !== '' ? $firstDay : today_date());
+$maxDate = today_date();
+
+$dateErrors = [];
+foreach (['from' => $from, 'to' => $to] as $field => $value) {
+    if ($value !== '' && !is_date_between($value, $minDate, $maxDate)) {
+        $dateErrors[$field] = date_range_message($minDate, $maxDate);
+    }
+}
+if (!$dateErrors && $from !== '' && $to !== '' && $from > $to) {
+    $dateErrors['to'] = 'Cannot be before the "From" date.';
+}
+
 $conditions = [];
 $params = [];
 if ($q !== '') {
-    $conditions[] = "(a.employee_number LIKE ? OR e.employee_number LIKE ? OR CONCAT(e.first_name, ' ', e.last_name) LIKE ? OR a.details LIKE ? OR a.ip_address LIKE ?)";
-    array_push($params, like_pattern($q), like_pattern($q), like_pattern($q), like_pattern($q), like_pattern($q));
+    $conditions[] = "(a.employee_number LIKE ? OR e.employee_number LIKE ? OR CONCAT(e.first_name, ' ', e.last_name) LIKE ? OR a.details LIKE ?)";
+    array_push($params, like_pattern($q), like_pattern($q), like_pattern($q), like_pattern($q));
 }
 if ($action !== '' && in_array($action, $actions, true)) {
     $conditions[] = 'a.action = ?';
     $params[] = $action;
 }
-if ($from !== '' && is_valid_date($from)) {
+// A wrong date range is reported next to the fields and not applied.
+if (!$dateErrors && $from !== '') {
     $conditions[] = 'a.created_at >= ?';
     $params[] = $from . ' 00:00:00';
 }
-if ($to !== '' && is_valid_date($to)) {
+if (!$dateErrors && $to !== '') {
     $conditions[] = 'a.created_at < ? + INTERVAL 1 DAY';
     $params[] = $to;
 }
@@ -40,7 +56,7 @@ $stmt = db()->prepare("SELECT COUNT(*) FROM audit_logs a LEFT JOIN employees e O
 $stmt->execute($params);
 $pages = pagination((int) $stmt->fetchColumn(), 25);
 
-$sort = sort_state(['date' => 'a.id', 'action' => 'a.action', 'employee' => 'e.last_name', 'ip' => 'a.ip_address'], 'date', 'desc');
+$sort = sort_state(['date' => 'a.id', 'action' => 'a.action', 'employee' => 'e.last_name'], 'date', 'desc');
 $stmt = db()->prepare(
     "SELECT a.*, e.first_name, e.last_name, e.employee_number AS current_number
      FROM audit_logs a
@@ -57,10 +73,10 @@ $breadcrumbs = [['Administration', url('admin/index.php')], ['Audit Log', null]]
 require __DIR__ . '/../includes/header.php';
 ?>
 
-<form method="get" class="filters" role="search">
+<form method="get" class="filters" role="search" novalidate>
     <div class="field field-wide">
         <label for="q">Search</label>
-        <input type="search" id="q" name="q" value="<?= e($q) ?>" placeholder="Employee, details or IP address">
+        <input type="search" id="q" name="q" value="<?= e($q) ?>" maxlength="<?= SEARCH_MAX_LENGTH ?>" placeholder="Employee or details">
     </div>
     <div class="field">
         <label for="action">Action</label>
@@ -69,16 +85,18 @@ require __DIR__ . '/../includes/header.php';
             <?= select_options(array_combine($actions, $actions) ?: [], $action) ?>
         </select>
     </div>
-    <div class="field">
-        <label for="from">From</label>
-        <input type="date" id="from" name="from" value="<?= e($from) ?>">
-    </div>
-    <div class="field">
-        <label for="to">To</label>
-        <input type="date" id="to" name="to" value="<?= e($to) ?>">
-    </div>
+    <?php foreach (['from' => 'From', 'to' => 'To'] as $field => $label): ?>
+        <div class="field<?= isset($dateErrors[$field]) ? ' has-error' : '' ?>">
+            <label for="<?= $field ?>"><?= $label ?></label>
+            <input type="date" id="<?= $field ?>" name="<?= $field ?>" value="<?= e($field === 'from' ? $from : $to) ?>"
+                   min="<?= e($minDate) ?>" max="<?= e($maxDate) ?>">
+        </div>
+    <?php endforeach; ?>
     <button type="submit" class="btn btn-secondary">Apply</button>
     <a class="btn btn-secondary" href="<?= e(url('admin/audit_log.php')) ?>">Clear</a>
+    <?php foreach ($dateErrors as $field => $message): ?>
+        <p class="field-error" data-for="<?= $field ?>"><?= $field === 'from' ? 'From' : 'To' ?>: <?= e($message) ?></p>
+    <?php endforeach; ?>
 </form>
 
 <div class="table-wrap">
@@ -89,7 +107,6 @@ require __DIR__ . '/../includes/header.php';
             <?= sort_th('Employee', 'employee', $sort) ?>
             <?= sort_th('Action', 'action', $sort) ?>
             <th scope="col">Details</th>
-            <?= sort_th('IP address', 'ip', $sort) ?>
         </tr>
         </thead>
         <tbody>
@@ -105,11 +122,10 @@ require __DIR__ . '/../includes/header.php';
                 </td>
                 <td><span class="badge <?= preg_match('/failed|locked|blocked/', $log['action']) ? 'badge-red' : 'badge-blue' ?>"><?= e($log['action']) ?></span></td>
                 <td><?= e($log['details']) ?></td>
-                <td class="nowrap"><?= e($log['ip_address']) ?></td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$logs): ?>
-            <tr class="empty-row"><td colspan="5">No entries match these filters.</td></tr>
+            <tr class="empty-row"><td colspan="4">No entries match these filters.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>

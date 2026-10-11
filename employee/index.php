@@ -35,10 +35,13 @@ foreach ($rows as $row) {
     }
 }
 
-$q = get_str('q');
+// Employee numbers are shown (and searchable) only for people who manage employees.
+$showNumbers = can_see_employee_numbers();
+
+$q = search_query();
 if ($q !== '') {
     $rows = array_values(array_filter($rows, fn($r) =>
-        mb_stripos($r['name'] . ' ' . $r['position'] . ' ' . $r['employee_number'], $q) !== false));
+        mb_stripos($r['name'] . ' ' . $r['position'] . ($showNumbers ? ' ' . $r['employee_number'] : ''), $q) !== false));
 }
 $sort = sort_state(['status' => 'status_order', 'name' => 'sort_name', 'position' => 'position', 'submitted' => 'submitted_at'], 'status');
 $rows = sort_rows($rows, $sort['column'], $sort['dir']);
@@ -107,7 +110,7 @@ require __DIR__ . '/../includes/header.php';
             <form method="get" class="filters" role="search">
                 <div class="field field-wide">
                     <label for="q">Search</label>
-                    <input type="search" id="q" name="q" value="<?= e($q) ?>" placeholder="Name or position">
+                    <input type="search" id="q" name="q" value="<?= e($q) ?>" maxlength="<?= SEARCH_MAX_LENGTH ?>" placeholder="Name or position">
                 </div>
                 <button type="submit" class="btn btn-secondary">Search</button>
                 <?php if ($q !== ''): ?><a class="btn btn-secondary" href="<?= e(url('employee/index.php')) ?>">Clear</a><?php endif; ?>
@@ -127,7 +130,7 @@ require __DIR__ . '/../includes/header.php';
                     <tbody>
                     <?php foreach ($rows as $row): ?>
                         <tr>
-                            <td><?= e($row['name']) ?><br><span class="muted small"><?= e($row['employee_number']) ?></span></td>
+                            <td><?= e($row['name']) ?><?php if ($showNumbers): ?><br><span class="muted small"><?= e($row['employee_number']) ?></span><?php endif; ?></td>
                             <td><?= e($row['position'] ?: '-') ?></td>
                             <td><?= status_badge($row['status']) ?></td>
                             <td class="nowrap"><?= e($row['submitted_at'] ? format_datetime($row['submitted_at']) : '-') ?></td>

@@ -54,7 +54,7 @@ if (is_post()) {
 $departments = departments_list();
 $roles = db()->query('SELECT id, name FROM roles ORDER BY name')->fetchAll();
 
-$q = get_str('q');
+$q = search_query();
 $deptFilter = get_str('department');
 $roleFilter = get_int('role');
 $status = get_str('status');
@@ -124,7 +124,7 @@ require __DIR__ . '/../includes/header.php';
 <form method="get" class="filters" role="search">
     <div class="field field-wide">
         <label for="q">Search</label>
-        <input type="search" id="q" name="q" value="<?= e($q) ?>" placeholder="Number, name, email or position">
+        <input type="search" id="q" name="q" value="<?= e($q) ?>" maxlength="<?= SEARCH_MAX_LENGTH ?>" placeholder="Number, name, email or position">
     </div>
     <div class="field">
         <label for="department">Department</label>
