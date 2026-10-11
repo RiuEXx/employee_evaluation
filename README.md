@@ -81,9 +81,9 @@ Every account starts with the PIN **1234** and must choose a new PIN at first lo
 
 | Role | Employee Number | Name | Department |
 |---|---|---|---|
-| CEO | `EMP1001` | Ricardo Villanueva | (none) |
-| Admin (HR) | `EMP1002` | Angela Mendoza, HR Manager | Human Resources |
-| Employee | `EMP1003` to `EMP1006` | Carlo Bautista, Patricia Lim, Joseph Navarro, Kristine Ramos | Human Resources |
+| CEO | `EMP1001` | Benjamin Alvarado | (none) |
+| Admin (HR) | `EMP1002` | James Caporal, HR Manager | Human Resources |
+| Employee | `EMP1003` to `EMP1006` | Aron Angeles, Liuri Cosme, Abraham Buquid, Kristine Ramos | Human Resources |
 | Employee | `EMP1007` to `EMP1011` | Miguel Torres, Andrea Cruz, Paolo Garcia, Bianca Flores, Daniel Aquino | Finance |
 | Employee | `EMP1012` to `EMP1017` | Mark Dela Cruz, Sofia Reyes, Gabriel Santos, Camille Tan, Joshua Castillo, Nicole Gonzales | Information Technology |
 | Employee | `EMP1018` to `EMP1022` | Antonio Rivera, Hannah Ocampo, Rafael Domingo, Jasmine Pascual, Vincent Mercado | Operations |

@@ -422,12 +422,12 @@ INSERT INTO employees
     (id, employee_number, first_name, last_name, email, position, department_id, role_id, pin_hash, must_change_pin, status, date_hired)
 VALUES
     -- Leadership
-    (1,  'EMP1001', 'Ricardo',  'Villanueva', 'ricardo.villanueva@evergreen.example', 'Chief Executive Officer',     NULL, 1, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2012-01-09'),
+    (1,  'EMP1001', 'Benjamin', 'Alvarado',   'benjamin.alvarado@evergreen.example',  'Chief Executive Officer',     NULL, 1, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2012-01-09'),
     -- Human Resources (the HR Manager is the system Admin)
-    (2,  'EMP1002', 'Angela',   'Mendoza',    'angela.mendoza@evergreen.example',     'HR Manager',                  1,    2, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2015-06-15'),
-    (3,  'EMP1003', 'Carlo',    'Bautista',   'carlo.bautista@evergreen.example',     'Recruitment Specialist',      1,    3, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2019-02-04'),
-    (4,  'EMP1004', 'Patricia', 'Lim',        'patricia.lim@evergreen.example',       'Training Coordinator',        1,    3, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2020-08-17'),
-    (5,  'EMP1005', 'Joseph',   'Navarro',    'joseph.navarro@evergreen.example',     'Compensation and Benefits Officer', 1, 3, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2018-11-05'),
+    (2,  'EMP1002', 'James',    'Caporal',    'james.caporal@evergreen.example',      'HR Manager',                  1,    2, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2015-06-15'),
+    (3,  'EMP1003', 'Aron',     'Angeles',    'aron.angeles@evergreen.example',       'Recruitment Specialist',      1,    3, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2019-02-04'),
+    (4,  'EMP1004', 'Liuri',    'Cosme',      'liuri.cosme@evergreen.example',        'Training Coordinator',        1,    3, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2020-08-17'),
+    (5,  'EMP1005', 'Abraham',  'Buquid',     'abraham.buquid@evergreen.example',     'Compensation and Benefits Officer', 1, 3, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2018-11-05'),
     (6,  'EMP1006', 'Kristine', 'Ramos',      'kristine.ramos@evergreen.example',     'HR Assistant',                1,    3, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2023-03-20'),
     -- Finance
     (7,  'EMP1007', 'Miguel',   'Torres',     'miguel.torres@evergreen.example',      'Finance Manager',             2,    3, '$2y$10$hn/N0.6PCn0SdFfce/bXe.oIwsh2ysXXvIlUxXK7uiKBee8xg2Cui', 1, 'active',   '2014-04-01'),
