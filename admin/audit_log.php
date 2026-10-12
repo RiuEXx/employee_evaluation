@@ -1,7 +1,7 @@
 <?php
 /**
  * Audit log viewer with filters (text, action, date range), sorting and paging.
- * Logins, failed logins, lockouts, PIN changes and resets, and every
+ * Logins, failed logins, PIN changes and resets, and every
  * administrative change are recorded here. Evaluation entries name the
  * period only, so the log never shows who evaluated whom.
  */

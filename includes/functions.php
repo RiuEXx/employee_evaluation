@@ -498,7 +498,7 @@ function status_badge(string $status): string
     $classes = [
         'active' => 'badge-green', 'open' => 'badge-green', 'completed' => 'badge-green', 'complete' => 'badge-green',
         'inactive' => 'badge-gray', 'closed' => 'badge-gray', 'draft' => 'badge-yellow',
-        'pending' => 'badge-yellow', 'in progress' => 'badge-blue', 'not started' => 'badge-red', 'locked' => 'badge-red',
+        'pending' => 'badge-yellow', 'in progress' => 'badge-blue', 'not started' => 'badge-red',
     ];
     $class = $classes[strtolower($status)] ?? 'badge-gray';
     return '<span class="badge ' . $class . '">' . e(ucfirst($status)) . '</span>';

@@ -10,7 +10,6 @@ $user = require_permission(...ADMIN_PERMISSIONS);
 $counts = db()->query(
     "SELECT SUM(status = 'active') AS active,
             SUM(status = 'inactive') AS inactive,
-            SUM(status = 'active' AND locked_until IS NOT NULL AND locked_until > NOW()) AS locked,
             SUM(status = 'active' AND must_change_pin = 1) AS pending_pin
      FROM employees"
 )->fetch();
@@ -64,11 +63,6 @@ require __DIR__ . '/../includes/header.php';
         <p class="stat-note"><?= plural($categoryCount, 'rating category', 'rating categories') ?></p>
     </div>
     <div class="stat accent">
-        <p class="stat-label">Locked accounts</p>
-        <p class="stat-value"><?= (int) $counts['locked'] ?></p>
-        <p class="stat-note">Locked after too many wrong PINs</p>
-    </div>
-    <div class="stat accent">
         <p class="stat-label">PIN change pending</p>
         <p class="stat-value"><?= (int) $counts['pending_pin'] ?></p>
         <p class="stat-note">Still using a new or reset PIN</p>
@@ -103,9 +97,6 @@ require __DIR__ . '/../includes/header.php';
         <?php if (can('employees.manage')): ?>
             <a class="btn btn-primary" href="<?= e(url('admin/employee_edit.php')) ?>">Add employee</a>
             <a class="btn btn-secondary" href="<?= e(url('admin/employee_import.php')) ?>">Import employees from CSV</a>
-        <?php endif; ?>
-        <?php if (can('pins.reset') && (int) $counts['locked'] > 0): ?>
-            <a class="btn btn-secondary" href="<?= e(url('admin/employees.php?status=locked')) ?>">Show locked accounts</a>
         <?php endif; ?>
         <?php if (can('departments.manage')): ?>
             <a class="btn btn-secondary" href="<?= e(url('admin/department_edit.php')) ?>">Add department</a>

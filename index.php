@@ -1,7 +1,7 @@
 <?php
 /**
  * Login page: Employee Number + 4-digit PIN.
- * Lockout, hashing and audit logging are handled by attempt_login() in includes/auth.php.
+ * Hashing and audit logging are handled by attempt_login() in includes/auth.php.
  */
 require_once __DIR__ . '/includes/bootstrap.php';
 
@@ -60,10 +60,7 @@ require __DIR__ . '/includes/header.php';
         <button type="submit" class="btn btn-primary btn-block">Log in</button>
     </form>
 
-    <p class="login-note">
-        After <?= setting_int('max_login_attempts', 5) ?> wrong PINs in a row the account is locked for
-        <?= setting_int('lockout_minutes', 15) ?> minutes. Forgot your PIN? Ask HR to reset it.
-    </p>
+    <p class="login-note">Forgot your PIN? Ask HR to reset it.</p>
 </section>
 
 <?php require __DIR__ . '/includes/footer.php'; ?>

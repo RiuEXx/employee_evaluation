@@ -2,13 +2,14 @@
 /**
  * Fixed application constants.
  *
- * Options that HR may want to change while the system runs (lockout length,
- * session timeout, anonymity threshold, and so on) live in the `settings`
+ * Options that HR may want to change while the system runs (session timeout,
+ * anonymity threshold, and so on) live in the `settings`
  * table instead and are edited on Admin > Settings.
  */
 
 define('APP_NAME', 'Employee Performance Evaluation System');
 define('APP_SHORT_NAME', 'Performance Evaluation');
+define('APP_AUTHOR', 'Buquid et al.'); // shown in the page footer
 
 // true shows full error details in the browser. Keep it false outside development.
 define('APP_DEBUG', false);

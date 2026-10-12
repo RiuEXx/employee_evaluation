@@ -156,7 +156,7 @@ function find_employee(int $id): ?array
 {
     $stmt = db()->prepare(
         'SELECT e.id, e.employee_number, e.first_name, e.last_name, e.email, e.position, e.department_id,
-                e.role_id, e.must_change_pin, e.status, e.failed_attempts, e.locked_until, e.last_login,
+                e.role_id, e.must_change_pin, e.status, e.last_login,
                 e.date_hired, e.created_at, r.name AS role_name, d.name AS department_name
          FROM employees e
          JOIN roles r ON r.id = e.role_id

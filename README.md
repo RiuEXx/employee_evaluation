@@ -153,14 +153,14 @@ colleagues by name only.
 
 ## 6. User guide: Admin (HR)
 
-- **Admin Dashboard**: account counts, locked accounts, PINs still to be changed, progress of the
+- **Admin Dashboard**: account counts, PINs still to be changed, progress of the
   open period, shortcuts and recent activity, plus a warning when the system ran into errors in the
   last 24 hours.
 - **Departments**: add, edit, activate or deactivate. Members of an inactive department do not take
   part in evaluations. A department with employees or evaluations cannot be deleted.
 - **Employees**: search and filter; **Add employee**; **Edit** (department, role, status, and so
   on); **Reset PIN** (back to the default PIN, or a random PIN shown once, see Settings);
-  **Unlock** a locked account; **Activate / Deactivate** (an inactive employee cannot log in, and
+  **Activate / Deactivate** (an inactive employee cannot log in, and
   their past evaluations are kept). An employee with evaluations cannot be deleted. When an
   employee changes department, the evaluations already submitted keep the old department.
 - **Employee numbers** are the role's tag plus digits. **Add employee** fills in the next free
@@ -182,7 +182,7 @@ colleagues by name only.
   Admin to let HR see results, or tick `evaluations.receive` for CEO (and give the CEO a
   department) to have the CEO evaluated. You cannot remove `roles.manage` from your own role.
   A new role needs a **number tag** (2 to 5 letters, e.g. `SUP`), which cannot be changed later.
-- **Audit Log**: logins, failed logins, lockouts, PIN changes and resets, session timeouts, and
+- **Audit Log**: logins, failed logins, PIN changes and resets, session timeouts, and
   every change made in Administration, with search, action and date filters.
 - **System Log**: problems the system ran into: crashes, PHP errors and warnings, a database that
   could not be reached, refused forms, denied access and missing pages, with the page, the user and
@@ -223,8 +223,6 @@ evaluation was submitted, but not for whom.
 | Show evaluator names on comments in the results pages | Off | For the CEO pages |
 | PIN for new and reset accounts | Default PIN | Or a random PIN shown once to HR |
 | Default PIN | 1234 | Users must change it at first login |
-| Failed logins before an account is locked | 5 | 3 to 10 |
-| Lockout duration (minutes) | 15 | HR can unlock earlier |
 | Log out after inactivity (minutes) | 15 | Session timeout |
 
 ## 9. Roles and permissions
@@ -247,9 +245,9 @@ Pages check **permissions**, which are stored in the database (`permissions` and
 ## 10. Security
 
 - PINs are stored only as `password_hash()` hashes and checked with `password_verify()`.
-- Accounts lock for 15 minutes after 5 wrong PINs in a row (both configurable); HR can unlock.
-  An unknown Employee Number takes as long to reject as a wrong PIN, so response times do not
-  reveal which numbers exist.
+- There is no account lockout, so nobody can lock another person out by typing wrong PINs.
+  Every failed login is written to the Audit Log. An unknown Employee Number takes as long to
+  reject as a wrong PIN, so response times do not reveal which numbers exist.
 - New and reset PINs must be changed at the next login.
 - The session id changes at login, after a PIN change, and every 10 minutes. The cookie is
   HttpOnly and SameSite=Lax. Users are logged out after 15 minutes without activity.
@@ -288,7 +286,7 @@ employee_evaluation/
   includes/
     bootstrap.php      Loaded by every page: error handling, session, timeout, CSRF check
     logger.php         System log: writes and reads logs/system-YYYY-MM-DD.log.php
-    auth.php           Login, lockout, session, permission checks
+    auth.php           Login, session, permission checks
     csrf.php           CSRF tokens
     functions.php      Escaping, URLs, settings, audit log, sorting, paging
     evaluation.php     Evaluation rules, score calculations, completion
@@ -320,7 +318,6 @@ employee_evaluation/
 | System Log says it cannot write to `logs` | Give the web server write access to the `logs` folder (on XAMPP for Windows it normally has it). |
 | An old login such as `EMP1001` no longer works | The database was upgraded: numbers now carry the role's tag (`CEO1001`, `ADM1002`). |
 | MySQL does not start in XAMPP | Another MySQL server is probably using port 3306. Stop it, or run XAMPP's MySQL on another port and set that port in `config/db.php`. |
-| "Account locked" | Wait for the lockout to end, or log in as HR and use **Unlock** on the Employees page. |
 | Forgot the HR or CEO PIN and nobody can reset it | Re-import `database/schema.sql` (this resets all data), or set `must_change_pin = 1` and copy another account's `pin_hash` in phpMyAdmin. |
 | Charts do not appear | Make sure `assets/vendor/chart.umd.min.js` exists and JavaScript is enabled. The numbers are always in the tables too. |
 | "The form has expired" | The page was open too long (the session timed out). Reload and try again. Other tabs reload by themselves after a login or logout, unless the browser blocks site storage. |

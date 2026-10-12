@@ -21,6 +21,9 @@
 --   4. permissions: system_log.view (Admin > System Log), given to every role
 --      that can view the audit log; employees.manage now also says that it
 --      shows employee numbers.
+--   5. Account lockout removed: the employees columns failed_attempts and
+--      locked_until and the settings max_login_attempts and lockout_minutes
+--      are deleted; pins.reset no longer mentions unlocking.
 -- =============================================================================
 
 USE employee_evaluation_db;
@@ -82,6 +85,29 @@ JOIN permissions s ON s.code = 'system_log.view';
 UPDATE permissions
 SET description = 'Add, edit, import, activate and deactivate employees; see employee numbers'
 WHERE code = 'employees.manage';
+
+-- 5. No account lockout.
+SET @sql := IF(
+    EXISTS(SELECT 1 FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees' AND COLUMN_NAME = 'failed_attempts'),
+    'ALTER TABLE employees DROP COLUMN failed_attempts',
+    'DO 0');
+PREPARE step FROM @sql;
+EXECUTE step;
+DEALLOCATE PREPARE step;
+
+SET @sql := IF(
+    EXISTS(SELECT 1 FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees' AND COLUMN_NAME = 'locked_until'),
+    'ALTER TABLE employees DROP COLUMN locked_until',
+    'DO 0');
+PREPARE step FROM @sql;
+EXECUTE step;
+DEALLOCATE PREPARE step;
+
+DELETE FROM settings WHERE setting_key IN ('max_login_attempts', 'lockout_minutes');
+
+UPDATE permissions SET description = 'Reset employee PINs' WHERE code = 'pins.reset';
 
 
 -- =============================================================================

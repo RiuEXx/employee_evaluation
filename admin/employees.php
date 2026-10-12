@@ -1,7 +1,7 @@
 <?php
 /**
  * Employees: list with search, filters, sorting and paging, plus the account
- * actions Reset PIN, Unlock, Activate and Deactivate.
+ * actions Reset PIN, Activate and Deactivate.
  * Deactivated employees cannot log in; their past evaluations are kept.
  */
 require_once __DIR__ . '/../includes/bootstrap.php';
@@ -11,7 +11,7 @@ $user = require_permission('employees.manage', 'pins.reset');
 if (is_post()) {
     $target = find_employee(post_int('id'));
     $action = post_str('action');
-    $needs = ['reset_pin' => 'pins.reset', 'unlock' => 'pins.reset', 'activate' => 'employees.manage', 'deactivate' => 'employees.manage'];
+    $needs = ['reset_pin' => 'pins.reset', 'activate' => 'employees.manage', 'deactivate' => 'employees.manage'];
 
     if (!$target || !isset($needs[$action])) {
         flash('error', 'That employee no longer exists.');
@@ -25,16 +25,12 @@ if (is_post()) {
 
     if ($action === 'reset_pin') {
         $pin = new_account_pin();
-        db()->prepare('UPDATE employees SET pin_hash = ?, must_change_pin = 1, failed_attempts = 0, locked_until = NULL WHERE id = ?')
+        db()->prepare('UPDATE employees SET pin_hash = ?, must_change_pin = 1 WHERE id = ?')
             ->execute([password_hash($pin['pin'], PASSWORD_DEFAULT), $target['id']]);
         audit_log('pin_reset', 'PIN reset for ' . $label . ($pin['random'] ? ' (random PIN).' : ' (default PIN).'));
         flash('success', $pin['random']
             ? 'The new PIN for ' . $label . ' is ' . $pin['pin'] . '. Give it to them now: it is shown only this once. They must change it at their next login.'
             : 'The PIN for ' . $label . ' was reset to the default PIN (' . $pin['pin'] . '). They must change it at their next login.');
-    } elseif ($action === 'unlock') {
-        db()->prepare('UPDATE employees SET failed_attempts = 0, locked_until = NULL WHERE id = ?')->execute([$target['id']]);
-        audit_log('account_unlock', 'Unlocked ' . $label . '.');
-        flash('success', $label . ' has been unlocked and can log in again.');
     } elseif ($action === 'deactivate') {
         if ((int) $target['id'] === (int) $user['id']) {
             flash('error', 'You cannot deactivate your own account.');
@@ -78,8 +74,6 @@ if ($roleFilter) {
 if ($status === 'active' || $status === 'inactive') {
     $conditions[] = 'e.status = ?';
     $params[] = $status;
-} elseif ($status === 'locked') {
-    $conditions[] = 'e.locked_until > NOW()';
 } elseif ($status === 'pin') {
     $conditions[] = 'e.must_change_pin = 1';
 }
@@ -95,8 +89,7 @@ $sort = sort_state([
 ], 'name');
 $stmt = db()->prepare(
     "SELECT e.id, e.employee_number, e.first_name, e.last_name, e.email, e.position, e.status,
-            e.must_change_pin, e.last_login, d.name AS department_name, r.name AS role_name,
-            (e.locked_until IS NOT NULL AND e.locked_until > NOW()) AS is_locked
+            e.must_change_pin, e.last_login, d.name AS department_name, r.name AS role_name
      FROM employees e
      JOIN roles r ON r.id = e.role_id
      LEFT JOIN departments d ON d.id = e.department_id
@@ -143,7 +136,7 @@ require __DIR__ . '/../includes/header.php';
     <div class="field">
         <label for="status">Status</label>
         <select id="status" name="status">
-            <?= select_options(['' => 'All', 'active' => 'Active', 'inactive' => 'Inactive', 'locked' => 'Locked', 'pin' => 'Must change PIN'], $status) ?>
+            <?= select_options(['' => 'All', 'active' => 'Active', 'inactive' => 'Inactive', 'pin' => 'Must change PIN'], $status) ?>
         </select>
     </div>
     <button type="submit" class="btn btn-secondary">Apply</button>
@@ -176,7 +169,6 @@ require __DIR__ . '/../includes/header.php';
                 <td><?= e($emp['role_name']) ?></td>
                 <td>
                     <?= status_badge($emp['status']) ?>
-                    <?php if ((int) $emp['is_locked'] === 1): ?> <?= status_badge('locked') ?><?php endif; ?>
                     <?php if ((int) $emp['must_change_pin'] === 1): ?><br><span class="muted small nowrap">Must change PIN</span><?php endif; ?>
                 </td>
                 <td class="nowrap"><?= e($emp['last_login'] ? format_datetime($emp['last_login']) : 'Never') ?></td>
@@ -192,13 +184,6 @@ require __DIR__ . '/../includes/header.php';
                                 <input type="hidden" name="id" value="<?= (int) $emp['id'] ?>">
                                 <button type="submit" name="action" value="reset_pin" class="btn btn-secondary btn-small">Reset PIN</button>
                             </form>
-                            <?php if ((int) $emp['is_locked'] === 1): ?>
-                                <form method="post" action="<?= e(current_request_uri()) ?>" class="inline-form">
-                                    <?= csrf_field() ?>
-                                    <input type="hidden" name="id" value="<?= (int) $emp['id'] ?>">
-                                    <button type="submit" name="action" value="unlock" class="btn btn-accent btn-small">Unlock</button>
-                                </form>
-                            <?php endif; ?>
                         <?php endif; ?>
                         <?php if (can('employees.manage') && !$isMe): ?>
                             <?php $deactivate = $emp['status'] === 'active'; ?>

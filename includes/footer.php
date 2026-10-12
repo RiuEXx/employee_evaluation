@@ -11,7 +11,7 @@ $layout = $layout ?? 'app';
     </main>
 </div>
 <footer class="site-footer">
-    <?= e(APP_NAME) ?> &middot; <?= e(setting('company_name', '')) ?> &middot; <?= date('Y') ?>
+    <?= e(APP_NAME) ?> &middot; <?= e(APP_AUTHOR) ?> &middot; <?= date('Y') ?>
 </footer>
 <?php endif; ?>
 

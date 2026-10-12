@@ -109,8 +109,6 @@ CREATE TABLE employees (
     pin_hash         VARCHAR(255)      NOT NULL,
     must_change_pin  TINYINT(1)        NOT NULL DEFAULT 1,
     status           ENUM('active','inactive') NOT NULL DEFAULT 'active',
-    failed_attempts  TINYINT UNSIGNED  NOT NULL DEFAULT 0,
-    locked_until     DATETIME          NULL,
     last_login       DATETIME          NULL,
     date_hired       DATE              NULL,
     created_at       DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -344,7 +342,7 @@ INSERT INTO permissions (code, description, group_name, sort_order) VALUES
     ('summary.view_own',    'View their own results summary (when Settings allow it)',   'Evaluations',    60),
     ('departments.manage',  'Add, edit and deactivate departments',                      'Administration', 70),
     ('employees.manage',    'Add, edit, import, activate and deactivate employees; see employee numbers', 'Administration', 80),
-    ('pins.reset',          'Reset employee PINs and unlock locked accounts',            'Administration', 90),
+    ('pins.reset',          'Reset employee PINs',                                       'Administration', 90),
     ('categories.manage',   'Manage rating categories and criteria',                     'Administration', 100),
     ('periods.manage',      'Create, open and close evaluation periods',                 'Administration', 110),
     ('roles.manage',        'Change which permissions each role has',                    'Administration', 120),
@@ -401,10 +399,6 @@ INSERT INTO settings (setting_key, setting_value, label, description, input_type
         'default:Use the default PIN|random:Generate a random PIN', NULL, NULL, 100),
     ('default_pin', '1234', 'Default PIN',
         'Exactly 4 digits. Users cannot keep this PIN: they must change it on first login.', 'text', NULL, NULL, NULL, 110),
-    ('max_login_attempts', '5', 'Failed logins before an account is locked',
-        'The account is locked after this many wrong PINs in a row.', 'int', NULL, 3, 10, 120),
-    ('lockout_minutes', '15', 'Lockout duration (minutes)',
-        'How long a locked account stays locked. HR can unlock it sooner.', 'int', NULL, 1, 1440, 130),
     ('session_timeout_minutes', '15', 'Log out after inactivity (minutes)',
         'Users are logged out after this many minutes without loading a page.', 'int', NULL, 5, 240, 140);
 

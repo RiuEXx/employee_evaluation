@@ -195,7 +195,7 @@ function is_valid_pin(string $pin): bool
 }
 
 /**
- * Checks an employee number and PIN, applying the lockout rules.
+ * Checks an employee number and PIN.
  * Returns ['ok' => true] or ['ok' => false, 'error' => message].
  */
 function attempt_login(string $employeeNumber, string $pin): array
@@ -206,13 +206,7 @@ function attempt_login(string $employeeNumber, string $pin): array
         return ['ok' => false, 'error' => 'Enter your employee number and your 4-digit PIN.'];
     }
 
-    $stmt = db()->prepare(
-        'SELECT id, employee_number, pin_hash, status,
-                (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
-                TIMESTAMPDIFF(SECOND, NOW(), locked_until) AS lock_seconds
-         FROM employees
-         WHERE employee_number = ?'
-    );
+    $stmt = db()->prepare('SELECT id, employee_number, pin_hash, status FROM employees WHERE employee_number = ?');
     $stmt->execute([$employeeNumber]);
     $employee = $stmt->fetch();
 
@@ -225,32 +219,8 @@ function attempt_login(string $employeeNumber, string $pin): array
     $id = (int) $employee['id'];
     $number = $employee['employee_number'];
 
-    if ((int) $employee['is_locked'] === 1) {
-        $minutes = max(1, (int) ceil(((int) $employee['lock_seconds']) / 60));
-        audit_log('login_blocked', 'Login attempt while the account is locked.', $id, $number);
-        return ['ok' => false, 'error' => 'This account is locked because of too many failed attempts. '
-            . 'Try again in ' . plural($minutes, 'minute') . ', or ask HR to unlock it.'];
-    }
-
     if (!password_verify($pin, $employee['pin_hash'])) {
-        $max = setting_int('max_login_attempts', 5);
-
-        // Count the failure in SQL so two attempts at the same moment are both counted.
-        db()->prepare('UPDATE employees SET failed_attempts = failed_attempts + 1 WHERE id = ?')->execute([$id]);
-        $stmt = db()->prepare('SELECT failed_attempts FROM employees WHERE id = ?');
-        $stmt->execute([$id]);
-        $attempts = (int) $stmt->fetchColumn();
-
-        if ($attempts >= $max) {
-            $lockMinutes = setting_int('lockout_minutes', 15);
-            db()->prepare('UPDATE employees SET failed_attempts = 0, locked_until = NOW() + INTERVAL ? MINUTE WHERE id = ?')
-                ->execute([$lockMinutes, $id]);
-            audit_log('account_locked', 'Locked for ' . $lockMinutes . ' minutes after ' . $attempts . ' failed attempts.', $id, $number);
-            return ['ok' => false, 'error' => 'Too many failed attempts. This account is now locked for '
-                . plural($lockMinutes, 'minute') . '.'];
-        }
-
-        audit_log('login_failed', 'Wrong PIN (attempt ' . $attempts . ' of ' . $max . ').', $id, $number);
+        audit_log('login_failed', 'Wrong PIN.', $id, $number);
         return $invalid;
     }
 
@@ -265,8 +235,7 @@ function attempt_login(string $employeeNumber, string $pin): array
         db()->prepare('UPDATE employees SET pin_hash = ? WHERE id = ?')
             ->execute([password_hash($pin, PASSWORD_DEFAULT), $id]);
     }
-    db()->prepare('UPDATE employees SET failed_attempts = 0, locked_until = NULL, last_login = NOW() WHERE id = ?')
-        ->execute([$id]);
+    db()->prepare('UPDATE employees SET last_login = NOW() WHERE id = ?')->execute([$id]);
 
     login_user($id);
     audit_log('login_success', 'Logged in.', $id, $number);
